@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     app_secret_key: str = "CHANGE_ME"
+    admin_bootstrap_secret: str = ""
     database_path: str = "./database/imao.sqlite3"
 
     upstream_interface: str = "REPLACE_WITH_ETHERNET_INTERFACE"
