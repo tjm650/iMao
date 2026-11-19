@@ -245,11 +245,11 @@ def usage_report(start_date: str | None = None, end_date: str | None = None) -> 
         raise HTTPException(status_code=422, detail="Report end date must not precede start date")
     clauses, params = [], []
     if start:
-        clauses.append("started_at >= ?")
-        params.append(start.isoformat() + "T00:00:00")
+        clauses.append("substr(started_at,1,10) >= ?")
+        params.append(start.isoformat())
     if end:
-        clauses.append("started_at < ?")
-        params.append((end + timedelta(days=1)).isoformat() + "T00:00:00")
+        clauses.append("substr(started_at,1,10) <= ?")
+        params.append(end.isoformat())
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     with connect() as db:
         sessions = db.execute(
@@ -258,11 +258,11 @@ def usage_report(start_date: str | None = None, end_date: str | None = None) -> 
         ).fetchone()
         voucher_clauses, voucher_params = [], []
         if start:
-            voucher_clauses.append("redeemed_at >= ?")
-            voucher_params.append(start.isoformat() + "T00:00:00")
+            voucher_clauses.append("substr(redeemed_at,1,10) >= ?")
+            voucher_params.append(start.isoformat())
         if end:
-            voucher_clauses.append("redeemed_at < ?")
-            voucher_params.append((end + timedelta(days=1)).isoformat() + "T00:00:00")
+            voucher_clauses.append("substr(redeemed_at,1,10) <= ?")
+            voucher_params.append(end.isoformat())
         voucher_where = (" WHERE " + " AND ".join(voucher_clauses)) if voucher_clauses else ""
         vouchers = db.execute(
             "SELECT COUNT(*) AS redeemed, COALESCE(SUM(quota_bytes),0) AS quota_issued, "
