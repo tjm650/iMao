@@ -39,14 +39,16 @@ def test_offsite_backup_encrypts_before_upload_and_checks_remote(monkeypatch):
     monkeypatch.setattr(backup, "run", fake_run)
 
     assert backup.main() == 0
-    assert len(commands) == 3
+    assert len(commands) == 4
     assert commands[1][0] == "/usr/bin/age"
     assert commands[2][0] == "/usr/bin/rclone"
     assert commands[2][1] == "copyto"
     assert "--immutable" in commands[2]
     assert commands[2][-1].startswith("cryptremote:imao/imao-")
     assert commands[2][-1].endswith(".sqlite3.age")
-    assert commands[2][1] != "check"
+    assert commands[3][0] == "/usr/bin/rclone"
+    assert commands[3][1] == "check"
+    assert "--one-way" in commands[3]
 
 
 def test_offsite_backup_rejects_non_remote_destination(monkeypatch):
