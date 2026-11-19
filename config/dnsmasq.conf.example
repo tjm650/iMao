@@ -7,7 +7,5 @@ dhcp-option=option:router,{{HOTSPOT_GATEWAY}}
 dhcp-option=option:dns-server,{{HOTSPOT_GATEWAY}}
 domain-needed
 bogus-priv
-no-resolv
-server=1.1.1.1
-server=9.9.9.9
+# dnsmasq uses the host's configured upstream resolvers from resolv.conf.
 # Do not use this file until the hotspot interface has its static gateway address.
