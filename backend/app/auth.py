@@ -1,3 +1,4 @@
+import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -75,7 +76,7 @@ def redeem_voucher(code: str, client_ip: str, client_mac: str) -> tuple[str, dic
             raise HTTPException(status_code=409, detail="This device already has an active session")
 
         session_id = secrets.token_urlsafe(32)
-        token_hash = __import__("hashlib").sha256(session_id.encode()).hexdigest()
+        token_hash = hashlib.sha256(session_id.encode()).hexdigest()
         db.execute(
             "UPDATE vouchers SET redeemed_at = ?, redeemed_by_user_id = NULL WHERE id = ? AND redeemed_at IS NULL",
             (now.isoformat(), voucher["id"]),
@@ -112,7 +113,6 @@ def current_session(request: Request) -> dict:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         raise HTTPException(status_code=401, detail="No active session")
-    import hashlib
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     with connect() as db:
         row = db.execute(
@@ -136,7 +136,6 @@ def current_session(request: Request) -> dict:
 def logout_session(request: Request, response: Response) -> dict[str, str]:
     token = request.cookies.get(COOKIE_NAME)
     if token:
-        import hashlib
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         with connect() as db:
             db.execute(
