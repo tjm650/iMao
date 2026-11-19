@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from backend.app.config import get_settings
+
 
 def _connect(path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(path, timeout=30)
@@ -59,6 +61,11 @@ def restore(backup_file: Path, database: Path, confirm: bool) -> Path:
         raise ValueError("Restore source and destination must differ")
     _integrity_check(backup_file)
     database.parent.mkdir(parents=True, exist_ok=True)
+    if database.exists():
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        safety_copy = database.with_name(f"{database.name}.pre-restore-{stamp}")
+        backup(database, safety_copy)
+        print(f"Pre-restore safety backup created: {safety_copy}")
     temporary = database.with_name(database.name + ".restore.tmp")
     if temporary.exists():
         raise FileExistsError(f"Temporary restore file already exists: {temporary}")
@@ -76,8 +83,8 @@ def restore(backup_file: Path, database: Path, confirm: bool) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--database", type=Path, default=Path("./database/imao.sqlite3"),
-                        help="live SQLite database path (default: ./database/imao.sqlite3)")
+    parser.add_argument("--database", type=Path, default=get_settings().database_file,
+                        help="live SQLite database path (defaults to DATABASE_PATH in .env)")
     commands = parser.add_subparsers(dest="command", required=True)
     backup_parser = commands.add_parser("backup", help="create a consistent SQLite backup")
     backup_parser.add_argument("--output", type=Path, help="backup path; defaults to ./backups with UTC timestamp")
