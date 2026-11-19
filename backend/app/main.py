@@ -289,11 +289,14 @@ def admin_usage_report(request: Request, start_date: str | None = None, end_date
 @app.get('/api/admin/vouchers/export.csv')
 def admin_voucher_export(request: Request, status: str | None = None):
     require_permission(request, 'voucher:read')
-    result = list_vouchers(limit=200, offset=0, status=status)
+    first = list_vouchers(limit=200, offset=0, status=status)
+    items = list(first['items'])
+    for offset in range(200, first['total'], 200):
+        items.extend(list_vouchers(limit=200, offset=offset, status=status)['items'])
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['Voucher ID', 'Batch', 'Quota MB', 'Used MB', 'Expires At', 'Created At', 'Redeemed At', 'Revoked At'])
-    for item in result['items']:
+    for item in items:
         writer.writerow([item['id'], item['batch_label'] or '', round(item['quota_bytes'] / 1048576, 2),
                          round(item['used_bytes'] / 1048576, 2), item['expires_at'] or '',
                          item['created_at'], item['redeemed_at'] or '', item['revoked_at'] or ''])
