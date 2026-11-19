@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>Connect | iMao</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <div class="brand-mark">i</div>
+      <p class="eyebrow">WI-FI ACCESS</p>
+      <h1>Welcome to iMao</h1>
+      <p class="muted">Enter your access voucher to connect to the internet.</p>
+
+      <form id="voucher-form">
+        <label for="voucher">Voucher code</label>
+        <input id="voucher" name="voucher" autocomplete="one-time-code"
+               placeholder="Enter your voucher" required>
+        <button type="submit">Connect to internet</button>
+        <p id="message" class="message" role="status" aria-live="polite"></p>
+      </form>
+      <p class="fine-print">Your access is subject to your voucher's data allowance and validity.</p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
