@@ -31,8 +31,8 @@ def _check_rate_limit(client_ip: str) -> None:
 def _record_attempt(client_ip: str, succeeded: bool) -> None:
     with connect() as db:
         db.execute(
-            "INSERT INTO login_attempts (client_ip, succeeded) VALUES (?, ?)",
-            (client_ip, int(succeeded)),
+            "INSERT INTO login_attempts (client_ip, succeeded, attempted_at) VALUES (?, ?, ?)",
+            (client_ip, int(succeeded), _now().isoformat()),
         )
         if succeeded:
             db.execute("DELETE FROM login_attempts WHERE client_ip = ?", (client_ip,))
