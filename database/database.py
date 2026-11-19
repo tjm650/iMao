@@ -18,10 +18,16 @@ def initialize_database(database_path: str | Path | None = None) -> None:
     schema = schema_path.read_text(encoding="utf-8")
     with connect(database_path) as connection:
         connection.executescript(schema)
-        # Safe additive migration for databases created by the first foundation stage.
+        # Additive migrations preserve databases created in earlier project stages.
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
-        if "session_token_hash" not in columns:
-            connection.execute("ALTER TABLE sessions ADD COLUMN session_token_hash TEXT")
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token_hash)"
-        )
+        migrations = {
+            "session_token_hash": "TEXT",
+            "expires_at": "TEXT",
+            "last_counter_up": "INTEGER",
+            "last_counter_down": "INTEGER",
+        }
+        for name, definition in migrations.items():
+            if name not in columns:
+                connection.execute(f"ALTER TABLE sessions ADD COLUMN {name} {definition}")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token_hash)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(status, expires_at)")
