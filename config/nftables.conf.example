@@ -1,6 +1,6 @@
 # Reference policy template. The installer generates interface/subnet-specific rules.
-# The dedicated iMao table is isolated from unrelated firewall tables.
-table inet imao {
+# The dedicated wiMao table is isolated from unrelated firewall tables.
+table inet wimao {
     set authorized_v4 {
         type ipv4_addr
         flags timeout
@@ -34,7 +34,7 @@ table inet imao {
     }
 }
 
-table ip imao_nat {
+table ip wimao_nat {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname "{{UPSTREAM_INTERFACE}}" ip saddr {{HOTSPOT_CIDR}} masquerade
