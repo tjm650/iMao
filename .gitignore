@@ -19,3 +19,6 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Locally rendered host-specific network configuration (contains Wi-Fi credentials)
+runtime-config/
