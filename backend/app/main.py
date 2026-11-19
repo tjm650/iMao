@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.config import get_settings
 from database.database import initialize_database
@@ -10,6 +11,8 @@ settings = get_settings()
 app = FastAPI(title="iMao Captive Portal", version="0.1.0")
 
 FRONTEND_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "login"
+if FRONTEND_ROOT.exists():
+    app.mount("/static", StaticFiles(directory=FRONTEND_ROOT), name="portal-static")
 
 
 @app.on_event("startup")
