@@ -90,4 +90,3 @@ CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time ON login_attempts(client_i
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
-CREATE INDEX IF NOT EXISTS idx_vouchers_batch ON vouchers(batch_id);
