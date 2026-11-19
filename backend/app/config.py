@@ -24,9 +24,12 @@ class Settings(BaseSettings):
     default_quota_mb: int = 500
     session_poll_seconds: int = 10
     session_stale_minutes: int = 5
+    session_max_hours: int = 12
 
     firewall_backend: str = "none"
     firewall_enabled: bool = False
+    netctl_path: str = "/usr/local/sbin/imao-netctl"
+    netctl_sudo: str = "/usr/bin/sudo"
 
     @property
     def database_file(self) -> Path:
