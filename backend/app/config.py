@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_secret_key: str = "CHANGE_ME"
     admin_bootstrap_secret: str = ""
-    database_path: str = "./database/imao.sqlite3"
+    database_path: str = "./database/wimao.sqlite3"
 
     upstream_interface: str = "REPLACE_WITH_ETHERNET_INTERFACE"
     hotspot_interface: str = "REPLACE_WITH_WIFI_INTERFACE"
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     firewall_backend: str = "none"
     firewall_enabled: bool = False
-    netctl_path: str = "/usr/local/sbin/imao-netctl"
+    netctl_path: str = "/usr/local/sbin/wimao-netctl"
     netctl_sudo: str = "/usr/bin/sudo"
 
     @property
