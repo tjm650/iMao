@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Discover host networking and render wiMao configs without changing the host."""
+"""Discover host networking and render wwiMao configs without changing the host."""
 import argparse
 import ipaddress
 import json
