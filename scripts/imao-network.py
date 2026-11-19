@@ -80,9 +80,14 @@ def render():
     if upstream == hotspot:
         raise SystemExit("UPSTREAM_INTERFACE and HOTSPOT_INTERFACE must be different.")
 
+    for name, value in (("UPSTREAM_INTERFACE", upstream), ("HOTSPOT_INTERFACE", hotspot)):
+        if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,15}", value):
+            raise SystemExit(f"{name} is not a valid Linux interface name.")
     ssid = required(env, "HOTSPOT_SSID")
     passphrase = required(env, "HOTSPOT_PASSPHRASE")
     country = required(env, "WIFI_COUNTRY_CODE")
+    if any(ch in ssid + passphrase for ch in "\\r\\n"):
+        raise SystemExit("SSID and passphrase must not contain newline characters.")
     if not re.fullmatch(r"[A-Z]{2}", country):
         raise SystemExit("WIFI_COUNTRY_CODE must be a two-letter uppercase country code.")
     if not 8 <= len(passphrase) <= 63:
