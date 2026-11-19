@@ -180,3 +180,27 @@ def test_admin_login_rate_limit_is_enforced_before_password_check(tmp_path, monk
     with pytest.raises(HTTPException) as error:
         admin.login_admin("missing", "incorrect-password", request, Response())
     assert error.value.status_code == 429
+
+
+def test_admin_state_changes_reject_cross_origin_requests():
+    from starlette.requests import Request
+
+    request = Request({
+        "type": "http", "method": "POST", "path": "/api/admin/vouchers/batches", "root_path": "",
+        "scheme": "http", "query_string": b"", "headers": [(b"origin", b"http://attacker.example")],
+        "server": ("testserver", 80), "client": ("127.0.0.1", 12345), "http_version": "1.1",
+    })
+    with pytest.raises(HTTPException) as error:
+        admin._validate_same_origin(request)
+    assert error.value.status_code == 403
+
+
+def test_admin_state_changes_accept_matching_origin():
+    from starlette.requests import Request
+
+    request = Request({
+        "type": "http", "method": "POST", "path": "/api/admin/vouchers/batches", "root_path": "",
+        "scheme": "http", "query_string": b"", "headers": [(b"origin", b"http://testserver")],
+        "server": ("testserver", 80), "client": ("127.0.0.1", 12345), "http_version": "1.1",
+    })
+    admin._validate_same_origin(request)
