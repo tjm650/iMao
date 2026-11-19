@@ -19,9 +19,11 @@ def client_is_authorized(client_ip: str) -> bool:
 
     with connect() as db:
         row = db.execute(
-            """SELECT expires_at FROM sessions
-               WHERE client_ip = ? AND status = 'active'
-               ORDER BY started_at DESC LIMIT 1""",
+            """SELECT s.expires_at FROM sessions s
+               JOIN vouchers v ON v.id = s.voucher_id
+               WHERE s.client_ip = ? AND s.status = 'active'
+                 AND s.revocation_pending = 0 AND v.used_bytes < v.quota_bytes
+               ORDER BY s.started_at DESC LIMIT 1""",
             (str(address),),
         ).fetchone()
     if not row:
