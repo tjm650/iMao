@@ -1,4 +1,4 @@
-# Rendered by scripts/imao-network.py.
+# Rendered by scripts/wimao-network.py.
 interface={{HOTSPOT_INTERFACE}}
 bind-dynamic
 dhcp-authoritative
