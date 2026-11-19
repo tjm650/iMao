@@ -4,13 +4,14 @@ from contextlib import suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.app.accounting import account_active_sessions, expire_sessions, retry_pending_revocations
 from backend.app.auth import authenticate_voucher, current_session, logout_session
 from backend.app.config import get_settings
+from backend.app.captive_portal import client_is_authorized
 from database.database import initialize_database
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,66 @@ async def shutdown() -> None:
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+
+
+
+def _probe_response(request: Request, platform: str) -> Response:
+    client_ip = request.client.host if request.client else ""
+    authorized = client_is_authorized(client_ip)
+    headers = {"Cache-Control": "no-store, private", "Pragma": "no-cache"}
+    if not authorized:
+        return RedirectResponse(url="/", status_code=302, headers=headers)
+    if platform == "android":
+        return Response(status_code=204, headers=headers)
+    if platform == "apple":
+        return Response(
+            content="<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>",
+            media_type="text/html", headers=headers,
+        )
+    if platform == "windows":
+        return PlainTextResponse("Microsoft Connect Test", headers=headers)
+    if platform == "windows-legacy":
+        return PlainTextResponse("Microsoft NCSI", headers=headers)
+    if platform == "firefox":
+        return PlainTextResponse("success", headers=headers)
+    return Response(status_code=204, headers=headers)
+
+
+@app.get("/generate_204", include_in_schema=False)
+@app.get("/gen_204", include_in_schema=False)
+def android_probe(request: Request):
+    return _probe_response(request, "android")
+
+
+@app.get("/hotspot-detect.html", include_in_schema=False)
+def apple_probe(request: Request):
+    return _probe_response(request, "apple")
+
+
+@app.get("/connecttest.txt", include_in_schema=False)
+def windows_probe(request: Request):
+    return _probe_response(request, "windows")
+
+
+@app.get("/ncsi.txt", include_in_schema=False)
+def windows_legacy_probe(request: Request):
+    return _probe_response(request, "windows-legacy")
+
+
+@app.get("/success.txt", include_in_schema=False)
+@app.get("/canonical.html", include_in_schema=False)
+def firefox_probe(request: Request):
+    return _probe_response(request, "firefox")
+
+
+@app.get("/api/captive-portal", include_in_schema=False)
+def captive_portal_api(request: Request):
+    client_ip = request.client.host if request.client else ""
+    return JSONResponse(
+        {"captive": not client_is_authorized(client_ip)},
+        media_type="application/captive+json",
+        headers={"Cache-Control": "no-store, private", "Vary": "Accept"},
+    )
 
 
 @app.get("/health")
