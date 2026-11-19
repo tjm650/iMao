@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safe SQLite backup, verification and restore utilities for wiMao."""
+"""Safe SQLite backup, verification and restore utilities for wwiMao."""
 from __future__ import annotations
 
 import argparse
@@ -70,7 +70,7 @@ def restore(backup_file: Path, database: Path, confirm: bool) -> Path:
     backup_file = backup_file.expanduser().resolve()
     database = database.expanduser().resolve()
     if not confirm:
-        raise ValueError("Restore is destructive; rerun with --confirm after stopping wiMao")
+        raise ValueError("Restore is destructive; rerun with --confirm after stopping wwiMao")
     if backup_file == database:
         raise ValueError("Restore source and destination must differ")
     _integrity_check(backup_file)
@@ -79,7 +79,7 @@ def restore(backup_file: Path, database: Path, confirm: bool) -> Path:
         sidecar = Path(str(database) + suffix)
         if sidecar.exists():
             raise RuntimeError(
-                f"SQLite sidecar remains: {sidecar}. Stop wiMao cleanly and confirm no process is using the database."
+                f"SQLite sidecar remains: {sidecar}. Stop wwiMao cleanly and confirm no process is using the database."
             )
     if database.exists():
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -116,7 +116,7 @@ def main() -> int:
     backup_parser.add_argument("--output", type=Path, help="backup path; defaults to ./backups with UTC timestamp")
     verify_parser = commands.add_parser("verify", help="run SQLite integrity_check on a backup")
     verify_parser.add_argument("backup_file", type=Path)
-    restore_parser = commands.add_parser("restore", help="restore a verified backup (stop wiMao first)")
+    restore_parser = commands.add_parser("restore", help="restore a verified backup (stop wwiMao first)")
     restore_parser.add_argument("backup_file", type=Path)
     restore_parser.add_argument("--confirm", action="store_true", help="confirm replacement of the live database")
     args = parser.parse_args()
@@ -124,7 +124,7 @@ def main() -> int:
     try:
         if args.command == "backup":
             stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            output = args.output or Path("backups") / f"wimao-{stamp}.sqlite3"
+            output = args.output or Path("backups") / f"wwimao-{stamp}.sqlite3"
             result = backup(args.database, output)
             print(f"Backup created and verified: {result}")
         elif args.command == "verify":
@@ -135,7 +135,7 @@ def main() -> int:
             print(f"Database restored from verified backup: {result}")
         return 0
     except (OSError, sqlite3.Error, RuntimeError, ValueError) as exc:
-        print(f"wiMao database operation failed: {exc}", file=sys.stderr)
+        print(f"wwiMao database operation failed: {exc}", file=sys.stderr)
         return 1
 
 
