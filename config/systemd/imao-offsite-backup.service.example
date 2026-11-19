@@ -1,21 +1,21 @@
 [Unit]
-Description=wiMao encrypted off-site database backup
-Documentation=https://github.com/tjm650/wiMao
+Description=wwiMao encrypted off-site database backup
+Documentation=https://github.com/tjm650/wwiMao
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=wimao
-Group=wimao
-WorkingDirectory=/opt/wimao
-EnvironmentFile=/etc/wimao/wimao.env
-EnvironmentFile=/etc/wimao/backup.env
-Environment=RCLONE_CONFIG=/etc/wimao/rclone.conf
-Environment=TMPDIR=/run/wimao-backup
-RuntimeDirectory=wimao-backup
+User=wwimao
+Group=wwimao
+WorkingDirectory=/opt/wwimao
+EnvironmentFile=/etc/wwimao/wwimao.env
+EnvironmentFile=/etc/wwimao/backup.env
+Environment=RCLONE_CONFIG=/etc/wwimao/rclone.conf
+Environment=TMPDIR=/run/wwimao-backup
+RuntimeDirectory=wwimao-backup
 RuntimeDirectoryMode=0700
-ExecStart=/opt/wimao/.venv/bin/python /opt/wimao/scripts/wimao-offsite-backup.py
+ExecStart=/opt/wwimao/.venv/bin/python /opt/wwimao/scripts/wwimao-offsite-backup.py
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
@@ -27,4 +27,4 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-ReadWritePaths=/var/lib/wimao
+ReadWritePaths=/var/lib/wwimao
