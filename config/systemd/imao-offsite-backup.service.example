@@ -11,6 +11,7 @@ Group=imao
 WorkingDirectory=/opt/imao
 EnvironmentFile=/etc/imao/imao.env
 EnvironmentFile=/etc/imao/backup.env
+Environment=RCLONE_CONFIG=/etc/imao/rclone.conf
 ExecStart=/opt/imao/.venv/bin/python /opt/imao/scripts/imao-offsite-backup.py
 UMask=0077
 NoNewPrivileges=true
