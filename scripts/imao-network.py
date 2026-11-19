@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+from urllib.parse import urlsplit
 import sys
 from pathlib import Path
 
@@ -100,7 +101,34 @@ def render():
         raise SystemExit("Choose a hotspot subnet with at least 8 usable addresses.")
     candidates = [ip for ip in hosts if ip != gateway]
     start, end = candidates[0], candidates[min(len(candidates)-1, 99)]
+    public_url = env.get("PORTAL_PUBLIC_URL", "").strip().rstrip("/")
+    portal_hostname = ""
+    api_uri = ""
+    dns_option = ""
+    dns_override = ""
+    if public_url:
+        parsed = urlsplit(public_url)
+        if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                or parsed.path not in ("", "/") or parsed.query or parsed.fragment
+                or parsed.port not in (None, 443)):
+            raise SystemExit("PORTAL_PUBLIC_URL must be an HTTPS origin such as https://portal.example.com.")
+        try:
+            ipaddress.ip_address(parsed.hostname)
+            raise SystemExit("PORTAL_PUBLIC_URL must use a DNS hostname, not an IP address.")
+        except ValueError:
+            pass
+        portal_hostname = parsed.hostname.encode("idna").decode("ascii").lower()
+        if not re.fullmatch(r"(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))+", portal_hostname):
+            raise SystemExit("PORTAL_PUBLIC_URL must contain a valid public DNS hostname.")
+        api_uri = f"https://{portal_hostname}/api/captive-portal"
+        if len(api_uri.encode("utf-8")) > 255:
+            raise SystemExit("The RFC 8910 DHCPv4 captive portal API URI must not exceed 255 bytes.")
+        dns_option = f'dhcp-option=114,"{api_uri}"'
+        dns_override = f"address=/{portal_hostname}/{gateway}"
+
     values = {
+        "PORTAL_DHCP_OPTION": dns_option,
+        "PORTAL_DNS_OVERRIDE": dns_override,
         "HOTSPOT_INTERFACE": hotspot, "UPSTREAM_INTERFACE": upstream,
         "HOTSPOT_CIDR": str(cidr), "HOTSPOT_GATEWAY": str(gateway),
         "HOTSPOT_SSID": ssid, "HOTSPOT_PASSPHRASE": passphrase,
@@ -119,7 +147,20 @@ def render():
         (output / name).write_text(content, encoding="utf-8")
         os.chmod(output / name, 0o600 if name == "hostapd.conf" else 0o644)
         print(f"Rendered {output / name}")
-    print("No host services or firewall rules were changed.")
+    caddy_path = output / "Caddyfile"
+    if portal_hostname:
+        caddy_template = ROOT / "config" / "Caddyfile.example"
+        caddy_content = caddy_template.read_text(encoding="utf-8")
+        caddy_content = caddy_content.replace("{{PORTAL_HOSTNAME}}", portal_hostname)
+        caddy_content = caddy_content.replace("{{PORTAL_PORT}}", values["PORTAL_PORT"])
+        if "{{" in caddy_content:
+            raise SystemExit("Unresolved placeholder in Caddyfile.")
+        caddy_path.write_text(caddy_content, encoding="utf-8")
+        os.chmod(caddy_path, 0o644)
+        print(f"Rendered {caddy_path}")
+    elif caddy_path.exists():
+        caddy_path.unlink()
+    print("No host services, certificates, interface settings or firewall rules were changed.")
 
 
 def main():
