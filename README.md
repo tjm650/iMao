@@ -437,6 +437,76 @@ Trust forwarded headers only from loopback so the API can identify hotspot clien
 - Keep firewall activation disabled until the network configuration and rollback path have been reviewed.
 - The privileged helper is intentionally separate from the FastAPI process and must remain root-owned.
 
+## Stage 7: deployment readiness, monitoring and recovery
+
+Stage 7 adds repository-level operational safeguards. It does not install services, start the gateway, assign network addresses, enable Wi-Fi or apply firewall rules.
+
+### Liveness and readiness checks
+
+- `GET /health` is a lightweight liveness check. It confirms that the API process is responding.
+- `GET /ready` checks database connectivity and the presence of core application tables. It returns HTTP 503 with a generic response if the application is not ready; it does not expose database paths or exception details.
+
+Use `/health` for process monitoring and `/ready` before sending user traffic. A successful readiness response is not proof that the Wi-Fi gateway, DNS, DHCP, firewall, upstream internet or TLS certificate is working.
+
+### SQLite backup and restore
+
+The `scripts/imao-db.py` utility uses SQLite's online backup API to create a consistent database snapshot, then runs `PRAGMA integrity_check`. Backup files are created with owner-only permissions (0600), and existing backup files are never overwritten.
+
+Create and verify a backup:
+
+~~~bash
+python scripts/imao-db.py backup --output /secure/backup/location/imao.sqlite3
+python scripts/imao-db.py verify /secure/backup/location/imao.sqlite3
+~~~
+
+If `--output` is omitted, a UTC timestamped file is created under `./backups`. The database path defaults to `DATABASE_PATH` from `.env`; it can be overridden with `--database`.
+
+Restore is a maintenance operation. Stop the iMao service first, verify the selected backup, then explicitly confirm the restore:
+
+~~~bash
+sudo systemctl stop imao
+python scripts/imao-db.py verify /secure/backup/location/imao.sqlite3
+python scripts/imao-db.py --database /var/lib/imao/imao.sqlite3 restore /secure/backup/location/imao.sqlite3 --confirm
+sudo systemctl start imao
+sudo systemctl status imao --no-pager
+~~~
+
+When the live database exists, the restore utility first creates and verifies a timestamped `.pre-restore-*` safety copy beside it. It then restores through a temporary file and atomic replacement. Do not restore while iMao is running or while another process is writing to the database. Store backups outside the web root, restrict access, encrypt off-host copies and periodically test restoration. A local backup alone does not protect against disk loss or theft.
+
+### systemd deployment template (future gateway operation)
+
+`config/systemd/imao.service.example` is a reviewable service template, not an installed service. It assumes:
+- Application code at `/opt/imao`
+- A dedicated unprivileged `imao` user and group
+- A protected environment file at `/etc/imao/imao.env`
+- SQLite state under `/var/lib/imao/`
+- A Python environment at `/opt/imao/.venv`
+
+Set `DATABASE_PATH=/var/lib/imao/imao.sqlite3` in the protected environment file and ensure the `imao` service account can access the configured state directory. The template binds Uvicorn to loopback by default so a local reverse proxy can be used. Do not expose the API listener directly to an untrusted network. Any change to the bind address for hotspot HTTP interception must be reviewed with the firewall and proxy design first.
+
+The template leaves `NoNewPrivileges=false` because the existing restricted network helper is invoked through a narrow sudoers rule. This is a deliberate privilege boundary that must be reviewed: keep the helper root-owned, keep sudoers limited to the exact helper executable, and do not grant a general shell or unrestricted sudo access to the service account.
+
+Before a future installation, review the template and validate it with:
+
+~~~bash
+sudo systemd-analyze verify config/systemd/imao.service.example
+sudo systemd-analyze security imao.service
+~~~
+
+A future gateway operator may install a reviewed copy, then inspect it with `systemctl status` and `journalctl`. Do not copy, enable or start this service as part of ordinary application development. Service installation and startup require a separate deployment approval and rollback plan.
+
+### Operational monitoring and recovery checklist
+
+Before production use, an operator must:
+1. Monitor `/health` and `/ready` from an independent monitoring host.
+2. Alert on repeated accounting-cycle errors, failed network revocation retries, service restarts and low disk space.
+3. Configure encrypted, off-host backups with retention and access controls.
+4. Run a restore drill and confirm voucher, administrator, session and audit data after recovery.
+5. Document recovery access, service restart order, network rollback and certificate renewal checks.
+6. Test power loss, disk-full behavior, database corruption handling and recovery on the target Linux distribution.
+
+The current repository does not configure a monitoring provider, backup schedule, remote alert destination or gateway host. Those remain explicit deployment tasks.
+
 ## Roadmap
 
 1. Project foundation
@@ -445,4 +515,4 @@ Trust forwarded headers only from loopback so the API can identify hotspot clien
 4. Privileged session authorization bridge, per-client traffic accounting and quota enforcement (implementation committed; target-host validation pending)
 5. Captive portal detection and client experience (HTTP interception, optional Caddy TLS template and DHCPv4 option 114 renderer implemented; deployment validation and IPv6 support pending)
 6. Admin dashboard, role-based access, voucher batches, exports and usage reports
-7. systemd deployment, recovery and security testing
+7. Deployment readiness, monitoring probes, SQLite backup/restore tooling and hardened systemd template (implementation started; target-host validation pending)
