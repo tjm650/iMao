@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check wiMao liveness/readiness and optionally send a generic webhook alert."""
+"""Check wwiMao liveness/readiness and optionally send a generic webhook alert."""
 from __future__ import annotations
 
 import json
@@ -40,9 +40,9 @@ def alert(webhook: str, message: str, timeout: float) -> None:
 
 
 def main() -> int:
-    base = os.environ.get("WIMAO_MONITOR_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-    timeout = float(os.environ.get("WIMAO_MONITOR_TIMEOUT_SECONDS", "5"))
-    webhook = os.environ.get("WIMAO_ALERT_WEBHOOK", "").strip()
+    base = os.environ.get("WWIMAO_MONITOR_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    timeout = float(os.environ.get("WWIMAO_MONITOR_TIMEOUT_SECONDS", "5"))
+    webhook = os.environ.get("WWIMAO_ALERT_WEBHOOK", "").strip()
     checks = [("liveness", base + "/health"), ("readiness", base + "/ready")]
     failures = []
     for name, url in checks:
@@ -53,7 +53,7 @@ def main() -> int:
 
     if failures and webhook:
         stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        message = "wiMao health check failed at " + stamp + ": " + "; ".join(failures)
+        message = "wwiMao health check failed at " + stamp + ": " + "; ".join(failures)
         try:
             alert(webhook, message, timeout)
             print("Alert delivered")
@@ -61,7 +61,7 @@ def main() -> int:
             print(f"Alert delivery failed: {type(exc).__name__}", file=sys.stderr)
             return 2
     elif failures:
-        print("No WIMAO_ALERT_WEBHOOK configured; no external alert was sent", file=sys.stderr)
+        print("No WWIMAO_ALERT_WEBHOOK configured; no external alert was sent", file=sys.stderr)
     return 1 if failures else 0
 
 
