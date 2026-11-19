@@ -1,0 +1,26 @@
+[Unit]
+Description=iMao encrypted off-site database backup
+Documentation=https://github.com/tjm650/iMao
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=imao
+Group=imao
+WorkingDirectory=/opt/imao
+EnvironmentFile=/etc/imao/imao.env
+EnvironmentFile=/etc/imao/backup.env
+ExecStart=/opt/imao/.venv/bin/python /opt/imao/scripts/imao-offsite-backup.py
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/imao
