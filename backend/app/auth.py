@@ -168,6 +168,9 @@ def current_session(request: Request) -> dict:
 
 
 def logout_session(request: Request, response: Response) -> dict[str, str]:
+    # Capture the final counter interval before removing its nftables counter rules.
+    from backend.app.accounting import account_active_sessions
+    account_active_sessions()
     token = request.cookies.get(COOKIE_NAME)
     if token:
         token_hash = hashlib.sha256(token.encode()).hexdigest()
