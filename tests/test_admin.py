@@ -99,7 +99,7 @@ def test_role_permissions_restrict_viewer_from_voucher_creation(tmp_path, monkey
         )
     request = Request({
         "type": "http", "method": "GET", "path": "/", "root_path": "",
-        "scheme": "http", "query_string": b"", "headers": [(b"cookie", f"imao_admin={token}".encode())],
+        "scheme": "http", "query_string": b"", "headers": [(b"cookie", f"wimao_admin={token}".encode())],
         "server": ("testserver", 80), "client": ("127.0.0.1", 12345), "http_version": "1.1",
     })
     assert admin.require_permission(request, "reports:read")["role"] == "viewer"
@@ -172,7 +172,7 @@ def test_inactive_admin_cannot_reuse_existing_session(tmp_path, monkeypatch):
         db.execute("UPDATE admin_users SET is_active=0 WHERE id=?", (admin_id,))
     request = Request({
         "type": "http", "method": "GET", "path": "/", "root_path": "",
-        "scheme": "http", "query_string": b"", "headers": [(b"cookie", f"imao_admin={token}".encode())],
+        "scheme": "http", "query_string": b"", "headers": [(b"cookie", f"wimao_admin={token}".encode())],
         "server": ("testserver", 80), "client": ("127.0.0.1", 12345), "http_version": "1.1",
     })
     with pytest.raises(HTTPException) as error:
