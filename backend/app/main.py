@@ -147,7 +147,28 @@ def captive_portal_api(request: Request):
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Liveness probe: confirms that the ASGI process is responding."""
     return {"status": "ok", "service": "imao"}
+
+
+@app.get("/ready")
+def readiness():
+    """Readiness probe: confirms the database schema needed by the app is available."""
+    try:
+        with connect() as db:
+            db.execute("SELECT 1").fetchone()
+            tables = {
+                row[0] for row in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+        required = {"vouchers", "sessions", "admin_users"}
+        if not required.issubset(tables):
+            raise RuntimeError("Required database tables are missing")
+    except Exception:
+        logger.exception("iMao readiness check failed")
+        return JSONResponse({"status": "not_ready", "service": "imao"}, status_code=503)
+    return {"status": "ready", "service": "imao"}
 
 
 @app.get("/", include_in_schema=False)
