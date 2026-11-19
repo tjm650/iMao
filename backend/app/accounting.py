@@ -18,23 +18,43 @@ def counter_delta(previous: int | None, current: int) -> int:
 
 def expire_sessions() -> int:
     now = datetime.now(timezone.utc).isoformat()
+    settings = get_settings()
+    should_revoke = settings.firewall_enabled and settings.firewall_backend == "nftables"
     with connect() as db:
         rows = db.execute(
             "SELECT id, client_ip FROM sessions WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?",
             (now,),
         ).fetchall()
         db.execute(
-            "UPDATE sessions SET status='expired', ended_at=? WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?",
-            (now, now),
+            """UPDATE sessions SET status='expired', ended_at=?, revocation_pending=?
+               WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?""",
+            (now, int(should_revoke), now),
         )
-    settings = get_settings()
-    if settings.firewall_enabled and settings.firewall_backend == "nftables":
-        for row in rows:
-            try:
-                revoke_client(row["client_ip"])
-            except NetctlError:
-                logger.exception("Could not revoke expired session %s", row["id"])
     return len(rows)
+
+
+def retry_pending_revocations() -> int:
+    settings = get_settings()
+    if not settings.firewall_enabled or settings.firewall_backend != "nftables":
+        return 0
+    with connect() as db:
+        pending = db.execute(
+            "SELECT id, client_ip FROM sessions WHERE revocation_pending=1"
+        ).fetchall()
+    completed = 0
+    for row in pending:
+        try:
+            revoke_client(row["client_ip"])
+        except NetctlError:
+            logger.exception("Network revocation remains pending for session %s", row["id"])
+            continue
+        with connect() as db:
+            db.execute(
+                "UPDATE sessions SET revocation_pending=0 WHERE id=? AND revocation_pending=1",
+                (row["id"],),
+            )
+        completed += 1
+    return completed
 
 
 def account_active_sessions() -> int:
@@ -55,7 +75,6 @@ def account_active_sessions() -> int:
             logger.exception("Could not read counters for session %s", session["id"])
             continue
 
-        exhausted = False
         with connect() as db:
             db.execute("BEGIN IMMEDIATE")
             current = db.execute(
@@ -82,10 +101,10 @@ def account_active_sessions() -> int:
             db.execute("UPDATE vouchers SET used_bytes=? WHERE id=?", (new_used, session["voucher_id"]))
             if new_used >= current["quota_bytes"]:
                 db.execute(
-                    "UPDATE sessions SET status='limit_reached', ended_at=?, revocation_pending=1 WHERE id=? AND status='active'",
+                    """UPDATE sessions SET status='limit_reached', ended_at=?,
+                       revocation_pending=1 WHERE id=? AND status='active'""",
                     (datetime.now(timezone.utc).isoformat(), session["id"]),
                 )
-                exhausted = True
             db.commit()
         processed += 1
     return processed
