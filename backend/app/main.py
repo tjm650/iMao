@@ -38,6 +38,14 @@ def portal_home():
     return FileResponse(page)
 
 
+@app.get("/connected", include_in_schema=False)
+def connected_page():
+    page = Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "index.html"
+    if not page.exists():
+        return JSONResponse({"detail": "Session page is not installed yet"}, status_code=503)
+    return FileResponse(page)
+
+
 @app.get("/api/config")
 def public_config() -> dict[str, int | str]:
     return {"service": "iMao", "default_quota_mb": settings.default_quota_mb}
