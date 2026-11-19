@@ -1,16 +1,18 @@
 import asyncio
+import csv
+import io
 import logging
 from contextlib import suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.app.accounting import account_active_sessions, expire_sessions, retry_pending_revocations
-from backend.app.admin import (create_voucher_batch, dashboard_summary, list_vouchers, login_admin,
-                               logout_admin, require_admin, revoke_voucher)
+from backend.app.admin import (create_voucher_batch, dashboard_summary, list_admins, list_vouchers, login_admin,
+                               logout_admin, require_admin, require_permission, revoke_voucher, update_admin_access, usage_report)
 from backend.app.auth import authenticate_voucher, current_session, logout_session
 from backend.app.config import get_settings
 from backend.app.captive_portal import client_is_authorized
@@ -181,33 +183,33 @@ def admin_logout(request: Request, response: Response):
 
 @app.get("/api/admin/summary")
 def admin_summary(request: Request):
-    require_admin(request)
+    require_permission(request, 'dashboard:read')
     return dashboard_summary()
 
 
 @app.get("/api/admin/vouchers")
 def admin_vouchers(request: Request, limit: int = 100, offset: int = 0, status: str | None = None):
-    require_admin(request)
+    require_permission(request, 'voucher:read')
     return list_vouchers(limit, offset, status)
 
 
 @app.post("/api/admin/vouchers/batches")
 def admin_create_batch(payload: VoucherBatchRequest, request: Request):
-    admin = require_admin(request)
+    admin = require_permission(request, 'voucher:create')
     return {"count": len(codes := create_voucher_batch(admin["id"], payload.count, megabytes_to_bytes(payload.quota_mb),
                                                          payload.expires_at, payload.label)), "codes": codes}
 
 
 @app.post("/api/admin/vouchers/{voucher_id}/revoke")
 def admin_revoke_voucher(voucher_id: int, request: Request):
-    admin = require_admin(request)
+    admin = require_permission(request, 'voucher:revoke')
     revoke_voucher(admin["id"], voucher_id)
     return {"status": "revoked"}
 
 
 @app.get("/api/admin/sessions")
 def admin_sessions(request: Request, limit: int = 100, offset: int = 0):
-    require_admin(request)
+    require_permission(request, 'reports:read')
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
     with connect() as db:
@@ -223,7 +225,7 @@ def admin_sessions(request: Request, limit: int = 100, offset: int = 0):
 
 @app.get("/api/admin/audit")
 def admin_audit(request: Request, limit: int = 100):
-    require_admin(request)
+    require_permission(request, 'audit:read')
     with connect() as db:
         rows = db.execute(
             """SELECT l.id, a.username, l.action, l.details, l.created_at
