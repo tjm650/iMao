@@ -6,8 +6,10 @@ dhcp-range={{HOTSPOT_DHCP_START}},{{HOTSPOT_DHCP_END}},12h
 dhcp-option=option:router,{{HOTSPOT_GATEWAY}}
 dhcp-option=option:dns-server,{{HOTSPOT_GATEWAY}}
 domain-needed
-# RFC 8910 DHCP option 114 is intentionally not enabled until a public HTTPS API URL is configured.
-# Example only: dhcp-option=114,https://portal.example.com/api/captive-portal
+# RFC 8910 option 114 MUST contain the HTTPS RFC 8908 API URI.
+{{PORTAL_DHCP_OPTION}}
+# Resolve the public portal hostname to the local hotspot gateway for clients.
+{{PORTAL_DNS_OVERRIDE}}
 bogus-priv
 # dnsmasq uses the host's configured upstream resolvers from resolv.conf.
 # Do not use this file until the hotspot interface has its static gateway address.
