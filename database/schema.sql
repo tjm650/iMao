@@ -47,6 +47,5 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_client ON sessions(client_mac, client_ip);
-CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token_hash);
 CREATE INDEX IF NOT EXISTS idx_vouchers_redeemed ON vouchers(redeemed_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time ON login_attempts(client_ip, attempted_at);
