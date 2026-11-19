@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "imao-db.py"
-SPEC = importlib.util.spec_from_file_location("imao_db", MODULE_PATH)
-imao_db = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(imao_db)
+MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "wimao-db.py"
+SPEC = importlib.util.spec_from_file_location("wimao_db", MODULE_PATH)
+wimao_db = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(wimao_db)
 
 
 def _database(path: Path, value: str) -> None:
@@ -21,24 +21,24 @@ def test_backup_is_consistent_and_private(tmp_path):
     source = tmp_path / "live.sqlite3"
     destination = tmp_path / "backups" / "snapshot.sqlite3"
     _database(source, "saved")
-    result = imao_db.backup(source, destination)
+    result = wimao_db.backup(source, destination)
     assert result == destination.resolve()
     assert destination.stat().st_mode & 0o777 == 0o600
     with sqlite3.connect(destination) as db:
         assert db.execute("SELECT value FROM sample").fetchone()[0] == "saved"
     with pytest.raises(FileExistsError):
-        imao_db.backup(source, destination)
+        wimao_db.backup(source, destination)
 
 
 def test_restore_requires_confirmation_and_restores_snapshot(tmp_path):
     source = tmp_path / "live.sqlite3"
     snapshot = tmp_path / "snapshot.sqlite3"
     _database(source, "original")
-    imao_db.backup(source, snapshot)
+    wimao_db.backup(source, snapshot)
     _database(source, "later")
     with pytest.raises(ValueError, match="--confirm"):
-        imao_db.restore(snapshot, source, False)
-    imao_db.restore(snapshot, source, True)
+        wimao_db.restore(snapshot, source, False)
+    wimao_db.restore(snapshot, source, True)
     with sqlite3.connect(source) as db:
         assert db.execute("SELECT value FROM sample ORDER BY rowid DESC LIMIT 1").fetchone()[0] == "original"
     safety_copies = list(tmp_path.glob("live.sqlite3.pre-restore-*"))
@@ -49,21 +49,21 @@ def test_restore_requires_confirmation_and_restores_snapshot(tmp_path):
 
 def test_verify_rejects_missing_file(tmp_path):
     with pytest.raises(FileNotFoundError):
-        imao_db._integrity_check(tmp_path / "missing.sqlite3")
+        wimao_db._integrity_check(tmp_path / "missing.sqlite3")
 
 
 def test_backup_refuses_same_source_and_destination(tmp_path):
     source = tmp_path / "live.sqlite3"
     _database(source, "value")
     with pytest.raises(ValueError, match="differ"):
-        imao_db.backup(source, source)
+        wimao_db.backup(source, source)
 
 
 def test_restore_refuses_when_sqlite_sidecar_is_present(tmp_path):
     source = tmp_path / "live.sqlite3"
     snapshot = tmp_path / "snapshot.sqlite3"
     _database(source, "original")
-    imao_db.backup(source, snapshot)
+    wimao_db.backup(source, snapshot)
     Path(str(source) + "-wal").write_bytes(b"stale")
     with pytest.raises(RuntimeError, match="sidecar remains"):
-        imao_db.restore(snapshot, source, True)
+        wimao_db.restore(snapshot, source, True)
