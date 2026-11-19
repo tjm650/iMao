@@ -26,7 +26,7 @@ Still pending:
 - Verification of actual nftables JSON/counter behavior on target distributions
 - Hard byte-exact quota enforcement (polling-based enforcement can exceed the limit between polls and during in-flight packets)
 - Reliable hostapd/dnsmasq setup, static hotspot address management and service lifecycle/rollback
-- OS captive-portal probe handlers (Android, Apple, Windows and Firefox) and RFC 8908 captive-state API foundation
+- OS captive-portal probes, RFC 8908 API, HTTP-only unauthenticated interception, optional Caddy TLS template and RFC 8910 DHCPv4 option 114 generation
 - Complete administration dashboard, voucher management, reporting, production deployment, monitoring and recovery testing
 
 ## Requirements
@@ -221,12 +221,15 @@ python scripts/imao-network.py render
 
 This creates files under runtime-config/. The hostapd file contains the Wi-Fi passphrase; keep it private. Rendering does not assign the gateway address, start hostapd/dnsmasq or apply firewall rules.
 
+If PORTAL_PUBLIC_URL is configured, review the generated Caddyfile. Ensure public DNS points to the gateway and ACME validation can reach Caddy on TCP 80/443. Set COOKIE_SECURE=true in the production .env. When FastAPI is behind Caddy, trust forwarded headers only from 127.0.0.1.
+
 Review the generated files:
 
 ~~~bash
 sed -n '1,200p' runtime-config/hostapd.conf
 sed -n '1,200p' runtime-config/dnsmasq.conf
 sed -n '1,240p' runtime-config/nftables.conf
+sed -n '1,160p' runtime-config/Caddyfile
 ~~~
 
 Do not share the hostapd output publicly because it contains the Wi-Fi password.
@@ -300,7 +303,7 @@ Do not use nft flush ruleset; it would remove rules belonging to other host serv
 
 ## Stage 3: network configuration details
 
-The renderer validates unresolved placeholders, distinct interface names, subnet/gateway relationship, country code, SSID length and WPA2 passphrase length. DHCP range is derived from the configured subnet. Generated files are local-only and excluded from Git.
+The renderer validates unresolved placeholders, distinct interface names, subnet/gateway relationship, country code, SSID length and WPA2 passphrase length. DHCP range is derived from the configured subnet. If PORTAL_PUBLIC_URL is set to an HTTPS DNS origin, it also generates a Caddy TLS reverse-proxy configuration, a local DNS override for the portal hostname and DHCPv4 option 114 containing the RFC 8908 API URI. Generated files are local-only and excluded from Git.
 
 The templates currently provide:
 - hostapd WPA2-PSK/CCMP access point configuration
@@ -318,7 +321,7 @@ When explicitly enabled on a prepared gateway:
 
 **Quota precision:** accounting polls every two seconds by default. Some extra data can pass between polls or while packets are in flight. Usage is capped in the database at the voucher allowance, and forwarding is revoked when the worker observes exhaustion. This is not byte-exact real-time enforcement yet.
 
-## Captive portal detection
+## Captive portal detection and HTTPS setup
 
 iMao now provides HTTP probe handlers for common operating-system checks. Unauthenticated clients receive an HTTP 302 redirect to the voucher portal; active clients receive the platform's expected online response. These handlers support probe-based detection and must be reached through the eventual gateway's HTTP interception/redirect rules. They do not intercept HTTPS.
 
@@ -328,7 +331,16 @@ iMao now provides HTTP probe handlers for common operating-system checks. Unauth
 - Firefox: `/success.txt` and `/canonical.html` return `success`.
 - RFC 8908: `/api/captive-portal` returns the per-client `captive` boolean using the `application/captive+json` media type.
 
-The RFC 8908 API currently omits `user-portal-url` because iMao does not yet have a configured public HTTPS portal origin. RFC 8910 DHCP option 114 must advertise the HTTPS API URI, not a plain HTTP page; the dnsmasq template is documented but deliberately not enabled until TLS/domain configuration is implemented. Probe handlers alone do not make a gateway captive: later deployment work must route relevant HTTP probes to iMao and provide a secure portal/API origin for RFC 8910-capable clients.
+For gateway deployment, set `PORTAL_PUBLIC_URL=https://portal.example.com` in the local `.env` to a DNS hostname you control. The renderer then:
+- Adds an nftables prerouting redirect for unauthenticated hotspot IPv4 TCP port 80 traffic to the local portal. Authorized clients are excluded. TCP 443 is never redirected.
+- Generates a Caddyfile that reverse-proxies the HTTPS hostname to FastAPI. Caddy obtains and renews a publicly trusted certificate when public DNS points to the gateway and inbound TCP ports 80 and 443 can reach Caddy (or another supported ACME challenge path is configured).
+- Adds a dnsmasq local DNS override so hotspot clients resolve the public portal hostname to the hotspot gateway address.
+- Advertises `https://portal.example.com/api/captive-portal` through DHCPv4 option 114. This MUST be the RFC 8908 API URI, not the user-facing portal URL.
+- Returns `user-portal-url` from the RFC 8908 API.
+
+The generated Caddyfile is a deployment template; Caddy is not installed or started automatically. In production, bind FastAPI to localhost behind Caddy and configure Uvicorn to trust forwarded headers only from loopback (for example, `--proxy-headers --forwarded-allow-ips=127.0.0.1`) so the API can identify hotspot client addresses without trusting arbitrary forwarded headers. Set `COOKIE_SECURE=true` when using HTTPS.
+
+**Important limitations:** the current gateway policy is IPv4-only; IPv6 captive enforcement and DHCPv6/RA option delivery remain pending. HTTP interception is limited to unauthenticated client TCP port 80. HTTPS is never intercepted. Caddy's public certificate issuance requires a reachable public DNS name and an ACME challenge path. The gateway operator must arrange router port forwarding or another supported ACME method; iMao does not supply a domain or certificate.
 
 
 - GET /api/captive-portal — RFC 8908 captive-state API
@@ -356,6 +368,6 @@ The RFC 8908 API currently omits `user-portal-url` because iMao does not yet hav
 2. Voucher authentication and session foundation
 3. Host network discovery, AP/DHCP/DNS templates and isolated nftables policy (target-host validation pending)
 4. Privileged session authorization bridge, per-client traffic accounting and quota enforcement (implementation committed; target-host validation pending)
-5. Captive portal detection and client experience (probe handlers/API foundation implemented; gateway interception and TLS discovery remain pending)
+5. Captive portal detection and client experience (HTTP interception, optional Caddy TLS template and DHCPv4 option 114 renderer implemented; deployment validation and IPv6 support pending)
 6. Admin dashboard, voucher batches and reports
 7. systemd deployment, recovery and security testing
