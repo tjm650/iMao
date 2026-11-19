@@ -44,10 +44,7 @@ def account_active_sessions() -> int:
 
     with connect() as db:
         sessions = db.execute(
-            """SELECT s.id, s.client_ip, s.last_counter_up, s.last_counter_down,
-                      v.id AS voucher_id
-               FROM sessions s JOIN vouchers v ON v.id = s.voucher_id
-               WHERE s.status = 'active'"""
+            "SELECT id, client_ip, voucher_id FROM sessions WHERE status='active'"
         ).fetchall()
 
     processed = 0
@@ -58,20 +55,24 @@ def account_active_sessions() -> int:
             logger.exception("Could not read counters for session %s", session["id"])
             continue
 
-        delta_up = counter_delta(session["last_counter_up"], current_up)
-        delta_down = counter_delta(session["last_counter_down"], current_down)
-        delta = delta_up + delta_down
         exhausted = False
         with connect() as db:
             db.execute("BEGIN IMMEDIATE")
             current = db.execute(
-                """SELECT s.status, v.quota_bytes, v.used_bytes
+                """SELECT s.status, s.last_counter_up, s.last_counter_down,
+                          v.quota_bytes, v.used_bytes
                    FROM sessions s JOIN vouchers v ON v.id=s.voucher_id
                    WHERE s.id=?""", (session["id"],)
             ).fetchone()
             if not current or current["status"] != "active":
                 db.rollback()
                 continue
+
+            # Recalculate inside the write transaction so multiple API workers
+            # cannot apply the same kernel-counter delta twice.
+            delta_up = counter_delta(current["last_counter_up"], current_up)
+            delta_down = counter_delta(current["last_counter_down"], current_down)
+            delta = delta_up + delta_down
             new_used = min(current["quota_bytes"], current["used_bytes"] + delta)
             db.execute(
                 """UPDATE sessions SET bytes_up=bytes_up+?, bytes_down=bytes_down+?,
