@@ -22,7 +22,7 @@ def expire_sessions() -> int:
     should_revoke = settings.firewall_enabled and settings.firewall_backend == "nftables"
     with connect() as db:
         rows = db.execute(
-            "SELECT id, client_ip FROM sessions WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?",
+            "SELECT id FROM sessions WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?",
             (now,),
         ).fetchall()
         db.execute(
@@ -63,32 +63,35 @@ def account_active_sessions() -> int:
         return 0
 
     with connect() as db:
-        sessions = db.execute(
-            "SELECT id, client_ip, voucher_id FROM sessions WHERE status='active'"
+        session_ids = db.execute(
+            "SELECT id FROM sessions WHERE status='active'"
         ).fetchall()
 
     processed = 0
-    for session in sessions:
-        try:
-            current_up, current_down = read_counters(session["client_ip"])
-        except NetctlError:
-            logger.exception("Could not read counters for session %s", session["id"])
-            continue
-
+    for item in session_ids:
+        session_id = item["id"]
         with connect() as db:
             db.execute("BEGIN IMMEDIATE")
             current = db.execute(
-                """SELECT s.status, s.last_counter_up, s.last_counter_down,
+                """SELECT s.status, s.client_ip, s.voucher_id,
+                          s.last_counter_up, s.last_counter_down,
                           v.quota_bytes, v.used_bytes
                    FROM sessions s JOIN vouchers v ON v.id=s.voucher_id
-                   WHERE s.id=?""", (session["id"],)
+                   WHERE s.id=?""", (session_id,)
             ).fetchone()
             if not current or current["status"] != "active":
                 db.rollback()
                 continue
 
-            # Recalculate inside the write transaction so multiple API workers
-            # cannot apply the same kernel-counter delta twice.
+            # Read kernel counters while holding the write lock. This prevents
+            # concurrent API workers from applying out-of-order counter snapshots.
+            try:
+                current_up, current_down = read_counters(current["client_ip"])
+            except NetctlError:
+                db.rollback()
+                logger.exception("Could not read counters for session %s", session_id)
+                continue
+
             delta_up = counter_delta(current["last_counter_up"], current_up)
             delta_down = counter_delta(current["last_counter_down"], current_down)
             delta = delta_up + delta_down
@@ -96,14 +99,14 @@ def account_active_sessions() -> int:
             db.execute(
                 """UPDATE sessions SET bytes_up=bytes_up+?, bytes_down=bytes_down+?,
                    last_counter_up=?, last_counter_down=? WHERE id=? AND status='active'""",
-                (delta_up, delta_down, current_up, current_down, session["id"]),
+                (delta_up, delta_down, current_up, current_down, session_id),
             )
-            db.execute("UPDATE vouchers SET used_bytes=? WHERE id=?", (new_used, session["voucher_id"]))
+            db.execute("UPDATE vouchers SET used_bytes=? WHERE id=?", (new_used, current["voucher_id"]))
             if new_used >= current["quota_bytes"]:
                 db.execute(
                     """UPDATE sessions SET status='limit_reached', ended_at=?,
                        revocation_pending=1 WHERE id=? AND status='active'""",
-                    (datetime.now(timezone.utc).isoformat(), session["id"]),
+                    (datetime.now(timezone.utc).isoformat(), session_id),
                 )
             db.commit()
         processed += 1
