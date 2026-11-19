@@ -31,11 +31,14 @@ CREATE TABLE IF NOT EXISTS sessions (
     client_mac TEXT NOT NULL,
     client_ip TEXT NOT NULL,
     started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TEXT,
     ended_at TEXT,
     bytes_up INTEGER NOT NULL DEFAULT 0,
     bytes_down INTEGER NOT NULL DEFAULT 0,
+    last_counter_up INTEGER,
+    last_counter_down INTEGER,
     status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'active', 'logged_out', 'limit_reached', 'stale', 'kicked'))
+        CHECK (status IN ('pending', 'active', 'logged_out', 'limit_reached', 'stale', 'kicked', 'expired'))
 );
 
 CREATE TABLE IF NOT EXISTS login_attempts (
