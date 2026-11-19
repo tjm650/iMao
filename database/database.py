@@ -18,3 +18,7 @@ def initialize_database(database_path: str | Path | None = None) -> None:
     schema = schema_path.read_text(encoding="utf-8")
     with connect(database_path) as connection:
         connection.executescript(schema)
+        # Safe additive migration for databases created by the first foundation stage.
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
+        if "session_token_hash" not in columns:
+            connection.execute("ALTER TABLE sessions ADD COLUMN session_token_hash TEXT")
