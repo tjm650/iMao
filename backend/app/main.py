@@ -66,7 +66,7 @@ def _probe_response(request: Request, platform: str) -> Response:
     authorized = client_is_authorized(client_ip)
     headers = {"Cache-Control": "no-store, private", "Pragma": "no-cache"}
     if not authorized:
-        return RedirectResponse(url="/", status_code=302, headers=headers)
+        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"), status_code=302, headers=headers)
     if platform == "android":
         return Response(status_code=204, headers=headers)
     if platform == "apple":
@@ -169,5 +169,5 @@ def captive_fallback(request: Request, path: str):
     """Redirect arbitrary intercepted HTTP requests to the voucher portal."""
     client_ip = request.client.host if request.client else ""
     if not client_is_authorized(client_ip):
-        return RedirectResponse(url="/", status_code=303, headers={"Cache-Control": "no-store"})
+        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"), status_code=303, headers={"Cache-Control": "no-store"})
     return JSONResponse({"detail": "Not found"}, status_code=404)
