@@ -598,3 +598,30 @@ The repository now provides daily encrypted off-site backup and five-minute moni
 5. Captive portal detection and client experience (HTTP interception, optional Caddy TLS template and DHCPv4 option 114 renderer implemented; deployment validation and IPv6 support pending)
 6. Admin dashboard, role-based access, voucher batches, exports and usage reports (implemented; target-host validation pending)
 7. Deployment readiness, monitoring probes, encrypted off-site backup automation and systemd timer templates (repository implementation added; remote configuration, activation and target-host validation pending)
+
+
+## Stage 7: operational recovery and deployment validation
+
+The gateway recovery and rollback procedure is maintained in [docs/OPERATIONS-RECOVERY.md](docs/OPERATIONS-RECOVERY.md). It covers diagnostic collection, safe service shutdown, removal of only iMao's dedicated nftables tables, host-network restoration boundaries, database recovery, and controlled service restart. It explicitly prohibits global firewall flushes.
+
+Before installing any example systemd unit on the eventual Linux gateway, copy the reviewed files into a staging directory and run:
+
+~~~bash
+sudo systemd-analyze verify /path/to/staged/imao.service /path/to/staged/imao-offsite-backup.service /path/to/staged/imao-offsite-backup.timer /path/to/staged/imao-monitor.service /path/to/staged/imao-monitor.timer
+sudo systemd-analyze security imao.service
+sudo systemd-analyze security imao-offsite-backup.service
+sudo systemd-analyze security imao-monitor.service
+~~~
+
+Use the actual staged filenames (without the `.example` suffix). Some hardening settings intentionally differ between services; review each reported exposure in context. These commands validate unit parsing and provide a security review aid; they do not install, start, or enable services. CI checks the template structure and critical safety settings, but only the target gateway can provide authoritative validation against its installed systemd version, filesystem layout, service account, executable paths, and local policy.
+
+The recovery runbook and automated deployment-safety tests are now in the repository. The following remain real deployment tasks and have **not** been performed by CI or by repository changes:
+
+- Choose and configure an off-site provider, create its remote configuration, and securely provision an age recipient. Keep the age private identity offline and separately backed up.
+- Configure a protected alert webhook destination and test delivery to that destination.
+- Run an actual encrypted upload, download, decrypt, SQLite integrity check, and application-level restoration drill on the target host.
+- Validate all systemd units and security profiles on the actual gateway.
+- Exercise network-service recovery and firewall rollback on isolated test hardware or a maintenance window with console access.
+- Complete an operator-led security review, including secrets handling, access controls, firewall policy, backup confidentiality, and incident response.
+
+Do not treat a successful CI run as proof that the real remote backup, alert delivery, gateway networking, or disaster-recovery procedure works. No host services or timers have been installed or enabled, and no network or firewall state has been changed.
