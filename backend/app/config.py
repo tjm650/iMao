@@ -6,11 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """All host-specific network settings come from the environment."""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "development"
     app_secret_key: str = "CHANGE_ME"
@@ -23,6 +19,7 @@ class Settings(BaseSettings):
 
     portal_host: str = "0.0.0.0"
     portal_port: int = 8000
+    cookie_secure: bool = False
 
     default_quota_mb: int = 500
     session_poll_seconds: int = 10
