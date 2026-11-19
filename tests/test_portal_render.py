@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "imao-network.py"
-SPEC = importlib.util.spec_from_file_location("imao_network", SCRIPT)
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "wimao-network.py"
+SPEC = importlib.util.spec_from_file_location("wimao_network", SCRIPT)
 network = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(network)
 
@@ -13,7 +13,7 @@ def _environment(url):
     return {
         "UPSTREAM_INTERFACE": "eth0", "HOTSPOT_INTERFACE": "wlan0",
         "HOTSPOT_CIDR": "10.42.0.0/24", "HOTSPOT_GATEWAY": "10.42.0.1",
-        "HOTSPOT_SSID": "iMao", "HOTSPOT_PASSPHRASE": "12345678",
+        "HOTSPOT_SSID": "wiMao", "HOTSPOT_PASSPHRASE": "12345678",
         "WIFI_COUNTRY_CODE": "ZW", "PORTAL_PORT": "8000", "COOKIE_SECURE": "true",
         "PORTAL_PUBLIC_URL": url,
     }
