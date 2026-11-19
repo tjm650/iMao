@@ -18,6 +18,11 @@ def _connect(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _create_private_file(path: Path) -> None:
+    descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(descriptor)
+
+
 def _integrity_check(path: Path) -> None:
     if not path.is_file():
         raise FileNotFoundError(f"Database file not found: {path}")
@@ -43,6 +48,7 @@ def backup(database: Path, destination: Path) -> Path:
     temporary = destination.with_name(destination.name + ".tmp")
     if temporary.exists():
         raise FileExistsError(f"Temporary backup already exists: {temporary}")
+    _create_private_file(temporary)
     try:
         source = _connect(database)
         target = _connect(temporary)
@@ -83,6 +89,7 @@ def restore(backup_file: Path, database: Path, confirm: bool) -> Path:
     temporary = database.with_name(database.name + ".restore.tmp")
     if temporary.exists():
         raise FileExistsError(f"Temporary restore file already exists: {temporary}")
+    _create_private_file(temporary)
     try:
         source = _connect(backup_file)
         target = _connect(temporary)
