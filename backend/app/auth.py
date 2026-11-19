@@ -10,7 +10,7 @@ from backend.app.netctl import NetctlError, authorize_client, revoke_client
 from backend.app.vouchers import hash_voucher
 from database.database import connect
 
-COOKIE_NAME = "imao_session"
+COOKIE_NAME = "wimao_session"
 MAX_FAILURES = 5
 LOCKOUT_MINUTES = 10
 
