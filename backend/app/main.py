@@ -9,25 +9,42 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.app.accounting import account_active_sessions, expire_sessions, retry_pending_revocations
+from backend.app.admin import (create_voucher_batch, dashboard_summary, list_vouchers, login_admin,
+                               logout_admin, require_admin, revoke_voucher)
 from backend.app.auth import authenticate_voucher, current_session, logout_session
 from backend.app.config import get_settings
 from backend.app.captive_portal import client_is_authorized
-from database.database import initialize_database
+from backend.app.quota import megabytes_to_bytes
+from database.database import connect, initialize_database
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-app = FastAPI(title="iMao Captive Portal", version="0.3.0")
+app = FastAPI(title="iMao Captive Portal", version="0.4.0")
 FRONTEND_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "login"
 if FRONTEND_ROOT.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_ROOT), name="portal-static")
-
 DASHBOARD_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "dashboard"
 if DASHBOARD_ROOT.exists():
     app.mount("/static-dashboard", StaticFiles(directory=DASHBOARD_ROOT), name="dashboard-static")
+ADMIN_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "admin"
+if ADMIN_ROOT.exists():
+    app.mount("/static-admin", StaticFiles(directory=ADMIN_ROOT), name="admin-static")
 
 
 class VoucherLogin(BaseModel):
     code: str = Field(min_length=8, max_length=64)
+
+
+class AdminLogin(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class VoucherBatchRequest(BaseModel):
+    count: int = Field(default=1, ge=1, le=500)
+    quota_mb: int = Field(default=500, ge=1, le=1048576)
+    expires_at: str | None = None
+    label: str | None = Field(default=None, max_length=100)
 
 
 async def _accounting_loop() -> None:
@@ -60,7 +77,6 @@ async def shutdown() -> None:
             await task
 
 
-
 def _probe_response(request: Request, platform: str) -> Response:
     client_ip = request.client.host if request.client else ""
     authorized = client_is_authorized(client_ip)
@@ -70,10 +86,8 @@ def _probe_response(request: Request, platform: str) -> Response:
     if platform == "android":
         return Response(status_code=204, headers=headers)
     if platform == "apple":
-        return Response(
-            content="<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>",
-            media_type="text/html", headers=headers,
-        )
+        return Response(content="<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>",
+                        media_type="text/html", headers=headers)
     if platform == "windows":
         return PlainTextResponse("Microsoft Connect Test", headers=headers)
     if platform == "windows-legacy":
@@ -116,11 +130,8 @@ def captive_portal_api(request: Request):
     payload = {"captive": not client_is_authorized(client_ip)}
     if settings.portal_public_url:
         payload["user-portal-url"] = settings.portal_public_url.rstrip("/") + "/"
-    return JSONResponse(
-        payload,
-        media_type="application/captive+json",
-        headers={"Cache-Control": "no-store, private", "Vary": "Accept"},
-    )
+    return JSONResponse(payload, media_type="application/captive+json",
+                        headers={"Cache-Control": "no-store, private", "Vary": "Accept"})
 
 
 @app.get("/health")
@@ -142,6 +153,68 @@ def connected_page():
     if not page.exists():
         return JSONResponse({"detail": "Session page is not installed yet"}, status_code=503)
     return FileResponse(page)
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_page():
+    page = ADMIN_ROOT / "index.html"
+    if not page.exists():
+        return JSONResponse({"detail": "Admin interface is not installed yet"}, status_code=503)
+    return FileResponse(page)
+
+
+@app.post("/api/admin/login")
+def admin_login(payload: AdminLogin, request: Request, response: Response):
+    return login_admin(payload.username, payload.password, request, response)
+
+
+@app.get("/api/admin/me")
+def admin_me(request: Request):
+    admin = require_admin(request)
+    return {"username": admin["username"], "expires_at": admin["expires_at"]}
+
+
+@app.post("/api/admin/logout")
+def admin_logout(request: Request, response: Response):
+    return logout_admin(request, response)
+
+
+@app.get("/api/admin/summary")
+def admin_summary(request: Request):
+    require_admin(request)
+    return dashboard_summary()
+
+
+@app.get("/api/admin/vouchers")
+def admin_vouchers(request: Request, limit: int = 100, offset: int = 0, status: str | None = None):
+    require_admin(request)
+    return list_vouchers(limit, offset, status)
+
+
+@app.post("/api/admin/vouchers/batches")
+def admin_create_batch(payload: VoucherBatchRequest, request: Request):
+    admin = require_admin(request)
+    return {"count": len(codes := create_voucher_batch(admin["id"], payload.count, megabytes_to_bytes(payload.quota_mb),
+                                                         payload.expires_at, payload.label)), "codes": codes}
+
+
+@app.post("/api/admin/vouchers/{voucher_id}/revoke")
+def admin_revoke_voucher(voucher_id: int, request: Request):
+    admin = require_admin(request)
+    revoke_voucher(admin["id"], voucher_id)
+    return {"status": "revoked"}
+
+
+@app.get("/api/admin/audit")
+def admin_audit(request: Request, limit: int = 100):
+    require_admin(request)
+    with connect() as db:
+        rows = db.execute(
+            """SELECT l.id, a.username, l.action, l.details, l.created_at
+               FROM audit_logs l LEFT JOIN admin_users a ON a.id=l.admin_user_id
+               ORDER BY l.id DESC LIMIT ?""", (max(1, min(limit, 200)),)
+        ).fetchall()
+    return {"items": [dict(row) for row in rows]}
 
 
 @app.get("/api/config")
@@ -166,8 +239,8 @@ def logout(request: Request, response: Response):
 
 @app.api_route("/{path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], include_in_schema=False)
 def captive_fallback(request: Request, path: str):
-    """Redirect arbitrary intercepted HTTP requests to the voucher portal."""
     client_ip = request.client.host if request.client else ""
     if not client_is_authorized(client_ip):
-        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"), status_code=303, headers={"Cache-Control": "no-store"})
+        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"),
+                                status_code=303, headers={"Cache-Control": "no-store"})
     return JSONResponse({"detail": "Not found"}, status_code=404)
