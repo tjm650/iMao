@@ -205,6 +205,22 @@ def admin_revoke_voucher(voucher_id: int, request: Request):
     return {"status": "revoked"}
 
 
+@app.get("/api/admin/sessions")
+def admin_sessions(request: Request, limit: int = 100, offset: int = 0):
+    require_admin(request)
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    with connect() as db:
+        total = db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+        rows = db.execute(
+            """SELECT s.id, s.client_mac, s.client_ip, s.started_at, s.ended_at, s.expires_at,
+                      s.status, s.bytes_up, s.bytes_down, v.id AS voucher_id
+               FROM sessions s LEFT JOIN vouchers v ON v.id=s.voucher_id
+               ORDER BY s.started_at DESC LIMIT ? OFFSET ?""", (limit, offset)
+        ).fetchall()
+    return {"items": [dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+
+
 @app.get("/api/admin/audit")
 def admin_audit(request: Request, limit: int = 100):
     require_admin(request)
