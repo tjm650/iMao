@@ -203,8 +203,10 @@ def admin_vouchers(request: Request, limit: int = 100, offset: int = 0, status: 
 
 
 @app.post("/api/admin/vouchers/batches")
-def admin_create_batch(payload: VoucherBatchRequest, request: Request):
+def admin_create_batch(payload: VoucherBatchRequest, request: Request, response: Response):
     admin = require_permission(request, "voucher:create")
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
     codes = create_voucher_batch(admin["id"], payload.count, megabytes_to_bytes(payload.quota_mb),
                                  payload.expires_at, payload.label)
     return {"count": len(codes), "codes": codes}
