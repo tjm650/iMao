@@ -39,3 +39,23 @@ def test_captive_portal_api_uses_rfc8908_media_type(monkeypatch):
     assert response.json() == {"captive": True}
     assert response.headers["content-type"].startswith("application/captive+json")
     assert response.headers["cache-control"] == "no-store, private"
+
+
+def test_probe_redirects_to_secure_portal_when_configured(monkeypatch):
+    monkeypatch.setattr(main, "client_is_authorized", lambda _ip: False)
+    monkeypatch.setattr(main.settings, "portal_public_url", "https://portal.example.com")
+    with TestClient(main.app) as client:
+        response = client.get("/generate_204", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://portal.example.com/"
+
+
+def test_captive_api_includes_user_portal_url_when_configured(monkeypatch):
+    monkeypatch.setattr(main, "client_is_authorized", lambda _ip: True)
+    monkeypatch.setattr(main.settings, "portal_public_url", "https://portal.example.com")
+    with TestClient(main.app) as client:
+        response = client.get("/api/captive-portal")
+    assert response.json() == {
+        "captive": False,
+        "user-portal-url": "https://portal.example.com/",
+    }
