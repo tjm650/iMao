@@ -1,0 +1,4 @@
+{
+  "hotspot_interface": "REPLACE_WITH_WIFI_INTERFACE",
+  "hotspot_cidr": "REPLACE_WITH_HOTSPOT_CIDR"
+}
