@@ -38,3 +38,4 @@ def initialize_database(database_path: str | Path | None = None) -> None:
         connection.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token_hash)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(status, expires_at)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_vouchers_batch ON vouchers(batch_id)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_vouchers_batch ON vouchers(batch_id)")
