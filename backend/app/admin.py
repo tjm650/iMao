@@ -21,15 +21,17 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_admin(username: str, password: str) -> None:
+def create_admin(username: str, password: str, role: str = 'admin') -> None:
     username = username.strip()
     if len(username) < 3 or len(username) > 64:
         raise ValueError("Username must be between 3 and 64 characters")
     if len(password) < 12 or len(password) > 256:
         raise ValueError("Password must be between 12 and 256 characters")
+    if role not in {"admin", "manager", "operator", "viewer"}:
+        raise ValueError("Role must be admin, manager, operator or viewer")
     password_hash = _passwords.hash(password)
     with connect() as db:
-        db.execute("INSERT INTO admin_users (username, password_hash) VALUES (?, ?)", (username, password_hash))
+        db.execute("INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)", (username, password_hash, role))
 
 
 def login_admin(username: str, password: str, request: Request, response: Response) -> dict:
@@ -75,7 +77,7 @@ def require_admin(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Administrator sign-in required")
     with connect() as db:
         row = db.execute(
-            """SELECT a.id, a.username, s.id AS session_id, s.expires_at
+            """SELECT a.id, a.username, a.role, s.id AS session_id, s.expires_at
                FROM admin_sessions s JOIN admin_users a ON a.id=s.admin_user_id
                WHERE s.token_hash=? AND s.revoked_at IS NULL AND a.is_active=1""",
             (_token_hash(token),),
@@ -182,3 +184,103 @@ def revoke_voucher(admin_id: int, voucher_id: int) -> None:
             db.execute("UPDATE vouchers SET revoked_at=? WHERE id=?", (now, voucher_id))
             db.execute("INSERT INTO audit_logs (admin_user_id, action, details, created_at) VALUES (?, ?, ?, ?)",
                        (admin_id, "voucher.revoked", f"Revoked unused voucher {voucher_id}", now))
+
+ROLE_PERMISSIONS = {
+    "admin": {"dashboard:read", "voucher:read", "voucher:create", "voucher:revoke", "reports:read", "admins:manage", "audit:read"},
+    "manager": {"dashboard:read", "voucher:read", "voucher:create", "voucher:revoke", "reports:read", "audit:read"},
+    "operator": {"dashboard:read", "voucher:read", "voucher:create"},
+    "viewer": {"dashboard:read", "voucher:read", "reports:read"},
+}
+
+
+def require_permission(request: Request, permission: str) -> dict:
+    admin = require_admin(request)
+    if permission not in ROLE_PERMISSIONS.get(admin["role"], set()):
+        raise HTTPException(status_code=403, detail="Your administrator role does not permit this action")
+    return admin
+
+
+def list_admins() -> list[dict]:
+    with connect() as db:
+        rows = db.execute(
+            "SELECT id, username, role, is_active, created_at, last_login_at FROM admin_users ORDER BY id"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_admin_access(actor_id: int, target_id: int, role: str, is_active: bool) -> None:
+    if role not in {"admin", "manager", "operator", "viewer"}:
+        raise HTTPException(status_code=422, detail="Unknown administrator role")
+    if actor_id == target_id and (role != "admin" or not is_active):
+        raise HTTPException(status_code=409, detail="You cannot demote or disable your own administrator account")
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        target = db.execute("SELECT id FROM admin_users WHERE id=?", (target_id,)).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Administrator not found")
+        if not is_active:
+            active_admins = db.execute(
+                "SELECT COUNT(*) FROM admin_users WHERE role='admin' AND is_active=1"
+            ).fetchone()[0]
+            current_admin = db.execute(
+                "SELECT role, is_active FROM admin_users WHERE id=?", (target_id,)
+            ).fetchone()
+            if current_admin["role"] == "admin" and current_admin["is_active"] and active_admins <= 1:
+                raise HTTPException(status_code=409, detail="At least one active administrator must remain")
+        db.execute("UPDATE admin_users SET role=?, is_active=? WHERE id=?",
+                   (role, int(is_active), target_id))
+        db.execute(
+            "INSERT INTO audit_logs (admin_user_id, action, details, created_at) VALUES (?, ?, ?, ?)",
+            (actor_id, "admin.access_updated", f"Updated administrator {target_id}: role={role}, active={int(is_active)}", _now().isoformat()),
+        )
+
+
+def usage_report(start_date: str | None = None, end_date: str | None = None) -> dict:
+    try:
+        start = datetime.fromisoformat(start_date).date() if start_date else None
+        end = datetime.fromisoformat(end_date).date() if end_date else None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Report dates must use YYYY-MM-DD") from exc
+    if start and end and end < start:
+        raise HTTPException(status_code=422, detail="Report end date must not precede start date")
+    clauses, params = [], []
+    if start:
+        clauses.append("started_at >= ?")
+        params.append(start.isoformat() + "T00:00:00")
+    if end:
+        clauses.append("started_at < ?")
+        params.append((end + timedelta(days=1)).isoformat() + "T00:00:00")
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    with connect() as db:
+        sessions = db.execute(
+            "SELECT COUNT(*) AS total, SUM(bytes_up) AS upload, SUM(bytes_down) AS download FROM sessions" + where,
+            params,
+        ).fetchone()
+        voucher_clauses, voucher_params = [], []
+        if start:
+            voucher_clauses.append("redeemed_at >= ?")
+            voucher_params.append(start.isoformat() + "T00:00:00")
+        if end:
+            voucher_clauses.append("redeemed_at < ?")
+            voucher_params.append((end + timedelta(days=1)).isoformat() + "T00:00:00")
+        voucher_where = (" WHERE " + " AND ".join(voucher_clauses)) if voucher_clauses else ""
+        vouchers = db.execute(
+            "SELECT COUNT(*) AS redeemed, COALESCE(SUM(quota_bytes),0) AS quota_issued, "
+            "COALESCE(SUM(used_bytes),0) AS voucher_usage FROM vouchers" + voucher_where,
+            voucher_params,
+        ).fetchone()
+        daily = db.execute(
+            "SELECT substr(started_at,1,10) AS day, COUNT(*) AS sessions, "
+            "COALESCE(SUM(bytes_up),0) AS upload, COALESCE(SUM(bytes_down),0) AS download "
+            "FROM sessions" + where + " GROUP BY substr(started_at,1,10) ORDER BY day",
+            params,
+        ).fetchall()
+    return {
+        "period": {"start": start.isoformat() if start else None, "end": end.isoformat() if end else None},
+        "sessions": {"total": int(sessions["total"] or 0), "upload_bytes": int(sessions["upload"] or 0),
+                     "download_bytes": int(sessions["download"] or 0)},
+        "vouchers": {"redeemed": int(vouchers["redeemed"] or 0), "quota_issued_bytes": int(vouchers["quota_issued"] or 0),
+                     "recorded_usage_bytes": int(vouchers["voucher_usage"] or 0)},
+        "daily": [dict(row) for row in daily],
+        "revenue": {"available": False, "reason": "iMao has no payment ledger or recorded transaction amounts yet."},
+    }
