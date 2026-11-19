@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Operates only on the dedicated wiMao nftables tables. Never flushes global rules.
+# Operates only on the dedicated wwiMao nftables tables. Never flushes global rules.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,44 +38,44 @@ require_firewall_enabled() {
 
 case "${1:-}" in
   check)
-    [[ -f "$NFT_FILE" ]] || { echo "Run scripts/wimao-network.py render first." >&2; exit 1; }
+    [[ -f "$NFT_FILE" ]] || { echo "Run scripts/wwimao-network.py render first." >&2; exit 1; }
     nft -c -f "$NFT_FILE"
     echo "Ruleset syntax is valid. No rules were applied."
     ;;
   install)
     require_firewall_enabled
-    [[ "${2:-}" == "--confirm" ]] || { echo "Usage: sudo scripts/wimao-firewall.sh install --confirm" >&2; exit 2; }
-    [[ -f "$NFT_FILE" ]] || { echo "Run scripts/wimao-network.py render first." >&2; exit 1; }
+    [[ "${2:-}" == "--confirm" ]] || { echo "Usage: sudo scripts/wwimao-firewall.sh install --confirm" >&2; exit 2; }
+    [[ -f "$NFT_FILE" ]] || { echo "Run scripts/wwimao-network.py render first." >&2; exit 1; }
     nft -c -f "$NFT_FILE"
-    # Replace only wiMao's own tables; unrelated firewall tables are left untouched.
-    nft delete table inet wimao 2>/dev/null || true
-    nft delete table ip wimao_nat 2>/dev/null || true
+    # Replace only wwiMao's own tables; unrelated firewall tables are left untouched.
+    nft delete table inet wwimao 2>/dev/null || true
+    nft delete table ip wwimao_nat 2>/dev/null || true
     nft -f "$NFT_FILE"
-    echo "wiMao firewall tables installed. No client is authorized yet."
+    echo "wwiMao firewall tables installed. No client is authorized yet."
     ;;
   authorize)
     require_firewall_enabled
-    [[ $# -eq 3 ]] || { echo "Usage: sudo scripts/wimao-firewall.sh authorize CLIENT_IPV4 TTL (e.g. 12h)" >&2; exit 2; }
+    [[ $# -eq 3 ]] || { echo "Usage: sudo scripts/wwimao-firewall.sh authorize CLIENT_IPV4 TTL (e.g. 12h)" >&2; exit 2; }
     python3 - "$2" <<'PY'
 import ipaddress, sys
 ipaddress.IPv4Address(sys.argv[1])
 PY
-    nft add element inet wimao authorized_v4 "{ $2 timeout $3 }"
+    nft add element inet wwimao authorized_v4 "{ $2 timeout $3 }"
     ;;
   revoke)
     require_firewall_enabled
-    [[ $# -eq 2 ]] || { echo "Usage: sudo scripts/wimao-firewall.sh revoke CLIENT_IPV4" >&2; exit 2; }
-    nft delete element inet wimao authorized_v4 "{ $2 }"
+    [[ $# -eq 2 ]] || { echo "Usage: sudo scripts/wwimao-firewall.sh revoke CLIENT_IPV4" >&2; exit 2; }
+    nft delete element inet wwimao authorized_v4 "{ $2 }"
     ;;
   status)
-    nft list table inet wimao
-    nft list table ip wimao_nat
+    nft list table inet wwimao
+    nft list table ip wwimao_nat
     ;;
   remove)
-    [[ "${2:-}" == "--confirm" ]] || { echo "Usage: sudo scripts/wimao-firewall.sh remove --confirm" >&2; exit 2; }
-    nft delete table inet wimao 2>/dev/null || true
-    nft delete table ip wimao_nat 2>/dev/null || true
-    echo "Only wiMao's dedicated nftables tables were removed."
+    [[ "${2:-}" == "--confirm" ]] || { echo "Usage: sudo scripts/wwimao-firewall.sh remove --confirm" >&2; exit 2; }
+    nft delete table inet wwimao 2>/dev/null || true
+    nft delete table ip wwimao_nat 2>/dev/null || true
+    echo "Only wwiMao's dedicated nftables tables were removed."
     ;;
   *)
     echo "Usage: $0 {check|install --confirm|authorize CLIENT_IPV4 TTL|revoke CLIENT_IPV4|status|remove --confirm}" >&2
