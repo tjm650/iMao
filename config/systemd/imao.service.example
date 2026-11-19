@@ -1,0 +1,35 @@
+[Unit]
+Description=iMao captive portal and voucher manager
+Documentation=https://github.com/tjm650/iMao
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=imao
+Group=imao
+WorkingDirectory=/opt/imao
+EnvironmentFile=/etc/imao/imao.env
+ExecStart=/opt/imao/.venv/bin/uvicorn backend.app.main:app --host ${PORTAL_HOST:-127.0.0.1} --port ${PORTAL_PORT:-8000} --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/imao
+ReadWritePaths=/var/log/imao
+
+[Install]
+WantedBy=multi-user.target
