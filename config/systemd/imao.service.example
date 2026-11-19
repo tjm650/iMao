@@ -10,14 +10,18 @@ User=imao
 Group=imao
 WorkingDirectory=/opt/imao
 EnvironmentFile=/etc/imao/imao.env
-ExecStart=/opt/imao/.venv/bin/uvicorn backend.app.main:app --host ${PORTAL_HOST:-127.0.0.1} --port ${PORTAL_PORT:-8000} --proxy-headers --forwarded-allow-ips=127.0.0.1
+# Safe default: loopback only. Change deliberately after reviewing the gateway
+# listener, Caddy proxy and firewall design.
+ExecStart=/opt/imao/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
 KillSignal=SIGINT
 UMask=0077
 
-NoNewPrivileges=true
+# The restricted netctl helper is invoked through a narrow sudoers rule.
+# Keep sudoers limited to /usr/local/sbin/imao-netctl and review this trade-off.
+NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
@@ -28,8 +32,9 @@ RestrictSUIDSGID=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StateDirectory=imao
+StateDirectoryMode=0750
 ReadWritePaths=/var/lib/imao
-ReadWritePaths=/var/log/imao
 
 [Install]
 WantedBy=multi-user.target
