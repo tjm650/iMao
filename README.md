@@ -2,47 +2,27 @@
 
 A lightweight, self-hosted Wi-Fi captive portal and voucher-based bandwidth manager for a Linux laptop acting as the gateway.
 
-## Current implementation status
+## Current status
 
-The repository currently contains the initial project foundation:
+Implemented:
+- FastAPI backend and health/config endpoints
+- Environment-based settings; no host-specific IP or interface values in tracked code
+- SQLite schema and additive session-token migration
+- Single-use voucher generation and HMAC-SHA256 voucher-code storage
+- Voucher redemption, client IP/MAC lookup using the Linux neighbour table, session cookies, status and logout endpoints
+- Failed-login throttling (5 failed attempts in a rolling 10-minute window per client IP)
+- Mobile-first voucher login page and quota calculation tests
 
-- FastAPI application and health endpoint
-- Environment-based configuration
-- SQLite schema for users, vouchers and sessions
-- Reusable quota calculations
-- Mobile-first voucher portal shell
-- Initial quota unit tests
-
-**The captive portal is not yet enforcing network access.** Voucher authentication, nftables integration, traffic accounting, admin functions and hotspot setup are subsequent implementation stages. Do not expose this initial service as a production gateway.
-
-## Architecture
-
-- `frontend/`: plain HTML, CSS and JavaScript
-- `backend/`: FastAPI application and business logic
-- `database/`: SQLite schema and connection helpers
-- `config/`: environment template and firewall configuration
-- `scripts/`: host setup and installation scripts
-- `systemd/`: service unit
-- `tests/`: automated tests
+Not yet implemented: firewall authorization, captive HTTP redirects, traffic counters, quota disconnection, admin authentication/dashboard, hotspot provisioning or production deployment. A successful portal session does **not** yet grant network access.
 
 ## Requirements
 
-- Ubuntu or Debian Linux
-- Python 3.10+
-- Ethernet connection for upstream internet
-- A separate Wi-Fi adapter capable of access-point mode
-- hostapd, dnsmasq and nftables (for the later gateway stage)
+- Ubuntu/Debian Linux, Python 3.10+
+- Ethernet upstream
+- Wi-Fi adapter capable of AP mode
+- Later stages: hostapd, dnsmasq, nftables and conntrack tools
 
-## Initial development setup
-
-1. Clone the repository.
-2. Create a virtual environment.
-3. Install backend dependencies.
-4. Copy `.env.example` to `.env`.
-5. Replace the interface and network placeholders with values discovered on the host.
-6. Set a strong random `APP_SECRET_KEY`.
-
-Example:
+## Development setup
 
 ```bash
 git clone https://github.com/tjm650/iMao.git
@@ -53,13 +33,37 @@ pip install -r backend/requirements.txt
 cp .env.example .env
 ```
 
-Run the initial development server from the repository root:
+Set a strong secret before creating vouchers. Generate one with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Put the result in local `.env` as `APP_SECRET_KEY`. Keep `.env` private and never commit it. Fill in `HOTSPOT_INTERFACE` and `HOTSPOT_CIDR` after discovering the actual host network. The voucher endpoint refuses to authenticate a client until those values are valid and its MAC address can be resolved from the Linux neighbour table.
+
+Start the app from the repository root:
 
 ```bash
 uvicorn backend.app.main:app --reload
 ```
 
-Open the portal at `http://127.0.0.1:8000` and health check at `http://127.0.0.1:8000/health`.
+Generate a single-use voucher (default 500 MB):
+
+```bash
+python scripts/create-voucher.py
+```
+
+Or set a different quota:
+
+```bash
+python scripts/create-voucher.py --quota-mb 1000
+```
+
+The raw voucher code is printed once. Store/share it securely; only its keyed hash is stored in SQLite. Optional expiry must be timezone-aware ISO-8601:
+
+```bash
+python scripts/create-voucher.py --quota-mb 500 --expires-at 2027-01-01T00:00:00+00:00
+```
 
 Run tests:
 
@@ -67,26 +71,29 @@ Run tests:
 python -m pytest tests
 ```
 
-## Network configuration policy
+## API
 
-All machine-specific interface names, addresses, subnet details and secrets belong in the local `.env` file. Never commit that file. The tracked `.env.example` contains placeholders only.
+- `POST /api/auth/voucher` JSON: `{"code":"XXXX-XXXX-XXXX-XXXX"}`; sets an HttpOnly, SameSite=Strict session cookie.
+- `GET /api/session` returns the active session allowance.
+- `POST /api/logout` ends the portal session and clears its cookie.
+- `GET /health` health check.
 
-The initial configuration assumes Ethernet upstream and voucher authentication, with a default quota of 500 MB. The hotspot interface and gateway network are intentionally unspecified until inspected on the target laptop.
+The portal uses the direct peer IP from the HTTP connection; it does not trust X-Forwarded-For. The backend checks that IP against `HOTSPOT_CIDR` and resolves its MAC using `ip neigh` on `HOTSPOT_INTERFACE`. This depends on the portal being reached directly on the hotspot LAN, not through an untrusted reverse proxy.
 
-## Safety
+## Host-specific configuration and safety
 
-- Do not enable firewall automation until the upstream and hotspot interfaces have been positively identified.
-- Keep local console access available while changing firewall rules.
-- The production firewall must default-deny unauthenticated forwarding and allow only explicitly authorized client identities.
-- A captive portal cannot decrypt or transparently redirect arbitrary HTTPS traffic.
-- Data enforcement must use cumulative counter deltas and persist usage so restarting the service cannot reset a user's quota.
+All machine-specific IP addresses, interface names, subnet details and secrets belong in local `.env` configuration. The tracked `.env.example` contains placeholders only.
+
+Firewall integration remains disabled (`FIREWALL_ENABLED=false`, `FIREWALL_BACKEND=none`). Do not enable it until the upstream Ethernet and hotspot Wi-Fi interfaces are positively identified and firewall rules are reviewed locally. Keep console access available during later firewall work.
+
+A captive portal cannot transparently redirect arbitrary HTTPS traffic. The later implementation will use operating-system captive-network detection and HTTP portal discovery.
 
 ## Roadmap
 
-1. Project foundation (current)
-2. Voucher authentication and secure session handling
+1. Foundation (complete)
+2. Voucher authentication and session foundation (implemented; requires host configuration and live integration tests)
 3. Hostapd/dnsmasq setup and nftables gateway rules
 4. Per-client traffic accounting and quota enforcement
-5. User status page and logout
-6. Admin dashboard, voucher batches and CSV reports
-7. systemd deployment, recovery and security tests
+5. User dashboard and logout experience
+6. Admin dashboard, voucher batches and reports
+7. systemd deployment, recovery and security testing
