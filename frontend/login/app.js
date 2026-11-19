@@ -29,7 +29,7 @@ form.addEventListener("submit", async (event) => {
     window.location.assign("/connected");
   } catch (error) {
     message.textContent = error instanceof TypeError
-      ? "Connection interrupted. Check that you're connected to the iMao Wi-Fi network and try again."
+      ? "Connection interrupted. Check that you're connected to the wiMao Wi-Fi network and try again."
       : (error.message || "Unable to connect. Please try again.");
     voucherInput.focus();
   } finally {
