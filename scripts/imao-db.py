@@ -21,8 +21,11 @@ def _connect(path: Path) -> sqlite3.Connection:
 def _integrity_check(path: Path) -> None:
     if not path.is_file():
         raise FileNotFoundError(f"Database file not found: {path}")
-    with _connect(path) as db:
+    db = _connect(path)
+    try:
         result = db.execute("PRAGMA integrity_check").fetchone()
+    finally:
+        db.close()
     if not result or result[0] != "ok":
         raise RuntimeError(f"SQLite integrity check failed for {path}: {result[0] if result else 'no result'}")
 
@@ -41,8 +44,13 @@ def backup(database: Path, destination: Path) -> Path:
     if temporary.exists():
         raise FileExistsError(f"Temporary backup already exists: {temporary}")
     try:
-        with _connect(database) as source, _connect(temporary) as target:
+        source = _connect(database)
+        target = _connect(temporary)
+        try:
             source.backup(target)
+        finally:
+            target.close()
+            source.close()
         _integrity_check(temporary)
         os.chmod(temporary, 0o600)
         os.replace(temporary, destination)
@@ -61,6 +69,12 @@ def restore(backup_file: Path, database: Path, confirm: bool) -> Path:
         raise ValueError("Restore source and destination must differ")
     _integrity_check(backup_file)
     database.parent.mkdir(parents=True, exist_ok=True)
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(str(database) + suffix)
+        if sidecar.exists():
+            raise RuntimeError(
+                f"SQLite sidecar remains: {sidecar}. Stop iMao cleanly and confirm no process is using the database."
+            )
     if database.exists():
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         safety_copy = database.with_name(f"{database.name}.pre-restore-{stamp}")
@@ -70,8 +84,13 @@ def restore(backup_file: Path, database: Path, confirm: bool) -> Path:
     if temporary.exists():
         raise FileExistsError(f"Temporary restore file already exists: {temporary}")
     try:
-        with _connect(backup_file) as source, _connect(temporary) as target:
+        source = _connect(backup_file)
+        target = _connect(temporary)
+        try:
             source.backup(target)
+        finally:
+            target.close()
+            source.close()
         _integrity_check(temporary)
         os.chmod(temporary, 0o600)
         os.replace(temporary, database)
