@@ -42,7 +42,13 @@ def find_counter_rules(ip):
 
 
 def remove_counters(ip):
-    for rule in find_counter_rules(ip).values():
+    try:
+        rules = find_counter_rules(ip)
+    except subprocess.CalledProcessError:
+        # If the dedicated iMao table was removed, the client is already blocked
+        # by that policy being absent; treat counter cleanup as complete.
+        return
+    for rule in rules.values():
         if rule and rule.get("handle") is not None:
             nft("delete", "rule", "inet", "imao", "forward", "handle", str(rule["handle"]))
 
