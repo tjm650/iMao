@@ -101,8 +101,10 @@ def redeem_voucher(code: str, client_ip: str, client_mac: str) -> tuple[str, str
 
 def authenticate_voucher(request: Request, response: Response, code: str) -> dict:
     client_ip, client_mac = resolve_client_identity(request)
-    token, session_id, quota = redeem_voucher(code, client_ip, client_mac)
     settings = get_settings()
+    if settings.firewall_enabled and settings.firewall_backend != "nftables":
+        raise HTTPException(status_code=503, detail="Unsupported firewall backend configuration")
+    token, session_id, quota = redeem_voucher(code, client_ip, client_mac)
     if settings.firewall_enabled and settings.firewall_backend == "nftables":
         try:
             authorize_client(client_ip)
@@ -110,13 +112,15 @@ def authenticate_voucher(request: Request, response: Response, code: str) -> dic
             # Do not consume the voucher if network authorization did not succeed.
             with connect() as db:
                 db.execute("BEGIN IMMEDIATE")
-                db.execute("UPDATE sessions SET status='kicked', ended_at=? WHERE id=? AND status='active'",
+                db.execute("UPDATE sessions SET status='kicked', ended_at=?, revocation_pending=1 WHERE id=? AND status='active'",
                            (_now().isoformat(), session_id))
                 db.execute("UPDATE vouchers SET redeemed_at=NULL WHERE id=(SELECT voucher_id FROM sessions WHERE id=?)",
                            (session_id,))
                 db.commit()
             try:
                 revoke_client(client_ip)
+                with connect() as db:
+                    db.execute("UPDATE sessions SET revocation_pending=0 WHERE id=?", (session_id,))
             except NetctlError:
                 pass
             raise HTTPException(status_code=503, detail="Network access could not be enabled. Please try again.") from exc
@@ -146,12 +150,14 @@ def current_session(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Session is no longer active")
     if row["expires_at"] and datetime.fromisoformat(row["expires_at"]) <= _now():
         with connect() as db:
-            db.execute("UPDATE sessions SET status='expired', ended_at=? WHERE id=? AND status='active'",
-                       (_now().isoformat(), row["id"]))
+            db.execute("UPDATE sessions SET status='expired', ended_at=?, revocation_pending=? WHERE id=? AND status='active'",
+                       (_now().isoformat(), int(get_settings().firewall_enabled), row["id"]))
         settings = get_settings()
         if settings.firewall_enabled and settings.firewall_backend == "nftables":
             try:
                 revoke_client(row["client_ip"])
+                with connect() as db:
+                    db.execute("UPDATE sessions SET revocation_pending=0 WHERE id=?", (row["id"],))
             except NetctlError:
                 pass
         raise HTTPException(status_code=401, detail="Session has expired")
@@ -179,14 +185,16 @@ def logout_session(request: Request, response: Response) -> dict[str, str]:
                 "SELECT client_ip FROM sessions WHERE session_token_hash=? AND status='active'", (token_hash,)
             ).fetchone()
             db.execute(
-                "UPDATE sessions SET status = 'logged_out', ended_at = ? WHERE session_token_hash = ? AND status = 'active'",
-                (_now().isoformat(), token_hash),
+                "UPDATE sessions SET status = 'logged_out', ended_at = ?, revocation_pending = ? WHERE session_token_hash = ? AND status = 'active'",
+                (_now().isoformat(), int(get_settings().firewall_enabled), token_hash),
             )
         settings = get_settings()
         if row and settings.firewall_enabled and settings.firewall_backend == "nftables":
             try:
                 revoke_client(row["client_ip"])
+                with connect() as db:
+                    db.execute("UPDATE sessions SET revocation_pending=0 WHERE session_token_hash=?", (token_hash,))
             except NetctlError as exc:
-                raise HTTPException(status_code=503, detail="Session ended, but network revocation needs administrator attention.") from exc
+                raise HTTPException(status_code=503, detail="Session ended; network revocation is queued for retry.") from exc
     response.delete_cookie(COOKIE_NAME, path="/", httponly=True, samesite="strict")
     return {"status": "logged_out"}
