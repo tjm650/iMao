@@ -1,18 +1,18 @@
 [Unit]
-Description=iMao captive portal and voucher manager
-Documentation=https://github.com/tjm650/iMao
+Description=wiMao captive portal and voucher manager
+Documentation=https://github.com/tjm650/wiMao
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
-User=imao
-Group=imao
-WorkingDirectory=/opt/imao
-EnvironmentFile=/etc/imao/imao.env
+User=wimao
+Group=wimao
+WorkingDirectory=/opt/wimao
+EnvironmentFile=/etc/wimao/wimao.env
 # Safe default: loopback only. Change deliberately after reviewing the gateway
 # listener, Caddy proxy and firewall design.
-ExecStart=/opt/imao/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart=/opt/wimao/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -20,7 +20,7 @@ KillSignal=SIGINT
 UMask=0077
 
 # The restricted netctl helper is invoked through a narrow sudoers rule.
-# Keep sudoers limited to /usr/local/sbin/imao-netctl and review this trade-off.
+# Keep sudoers limited to /usr/local/sbin/wimao-netctl and review this trade-off.
 NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
@@ -32,9 +32,9 @@ RestrictSUIDSGID=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-StateDirectory=imao
+StateDirectory=wimao
 StateDirectoryMode=0750
-ReadWritePaths=/var/lib/imao
+ReadWritePaths=/var/lib/wimao
 
 [Install]
 WantedBy=multi-user.target
