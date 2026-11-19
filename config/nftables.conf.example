@@ -20,6 +20,8 @@ table inet imao {
         iifname "{{HOTSPOT_INTERFACE}}" tcp dport 53 accept
         iifname "{{HOTSPOT_INTERFACE}}" tcp dport {{PORTAL_PORT}} accept
         iifname "{{HOTSPOT_INTERFACE}}" tcp dport 443 accept
+        # Keep the raw FastAPI listener inaccessible from the upstream/WAN side.
+        iifname "{{UPSTREAM_INTERFACE}}" tcp dport {{PORTAL_PORT}} drop
         iifname "{{HOTSPOT_INTERFACE}}" drop
     }
 
