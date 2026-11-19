@@ -14,8 +14,8 @@ def _load(name, path):
     return module
 
 
-backup = _load("imao_offsite_backup", "scripts/imao-offsite-backup.py")
-monitor = _load("imao_monitor", "scripts/imao-monitor.py")
+backup = _load("wimao_offsite_backup", "scripts/wimao-offsite-backup.py")
+monitor = _load("wimao_monitor", "scripts/wimao-monitor.py")
 
 
 def test_offsite_backup_requires_explicit_remote_and_age_recipient(monkeypatch):
@@ -26,13 +26,13 @@ def test_offsite_backup_requires_explicit_remote_and_age_recipient(monkeypatch):
 
 def test_offsite_backup_encrypts_before_upload_and_checks_remote(monkeypatch):
     monkeypatch.setenv("BACKUP_AGE_RECIPIENT", "age1publicrecipient")
-    monkeypatch.setenv("BACKUP_RCLONE_DESTINATION", "cryptremote:imao")
+    monkeypatch.setenv("BACKUP_RCLONE_DESTINATION", "cryptremote:wimao")
     monkeypatch.setattr(backup.shutil, "which", lambda name: f"/usr/bin/{name}")
     commands = []
 
     def fake_run(command):
         commands.append(command)
-        if "imao-db.py" in command[1]:
+        if "wimao-db.py" in command[1]:
             Path(command[command.index("--output") + 1]).write_bytes(b"sqlite-backup")
         elif command[0] == "/usr/bin/age":
             Path(command[command.index("--output") + 1]).write_bytes(b"encrypted")
@@ -44,7 +44,7 @@ def test_offsite_backup_encrypts_before_upload_and_checks_remote(monkeypatch):
     assert commands[2][0] == "/usr/bin/rclone"
     assert commands[2][1] == "copyto"
     assert "--immutable" in commands[2]
-    assert commands[2][-1].startswith("cryptremote:imao/imao-")
+    assert commands[2][-1].startswith("cryptremote:wimao/wimao-")
     assert commands[2][-1].endswith(".sqlite3.age")
     assert commands[3][0] == "/usr/bin/rclone"
     assert commands[3][1] == "check"
@@ -69,7 +69,7 @@ def test_monitor_accepts_expected_ready_payload(monkeypatch):
             return False
 
         def read(self, size):
-            return b'{"status":"ready","service":"imao"}'
+            return b'{"status":"ready","service":"wimao"}'
 
     monkeypatch.setattr(monitor.urllib.request, "urlopen", lambda *args, **kwargs: Response())
     assert monitor.check("http://127.0.0.1:8000/ready", 2) == (True, "OK")
@@ -86,7 +86,7 @@ def test_monitor_rejects_unhealthy_payload(monkeypatch):
             return False
 
         def read(self, size):
-            return b'{"status":"not_ready","service":"imao"}'
+            return b'{"status":"not_ready","service":"wimao"}'
 
     monkeypatch.setattr(monitor.urllib.request, "urlopen", lambda *args, **kwargs: Response())
     assert monitor.check("http://127.0.0.1:8000/ready", 2) == (False, "Unexpected health response")
