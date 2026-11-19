@@ -35,6 +35,28 @@ def create_admin(username: str, password: str, role: str = 'admin') -> None:
         db.execute("INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)", (username, password_hash, role))
 
 
+def bootstrap_admin(username: str, password: str) -> None:
+    """Create the first administrator exactly once, atomically."""
+    username = username.strip()
+    if len(username) < 3 or len(username) > 64:
+        raise ValueError("Username must be between 3 and 64 characters")
+    if len(password) < 12 or len(password) > 256:
+        raise ValueError("Password must be between 12 and 256 characters")
+    password_hash = _passwords.hash(password)
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if db.execute("SELECT COUNT(*) FROM admin_users").fetchone()[0]:
+            raise HTTPException(status_code=409, detail="Administrator setup has already been completed")
+        cursor = db.execute(
+            "INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, 'admin')",
+            (username, password_hash),
+        )
+        db.execute(
+            "INSERT INTO audit_logs (admin_user_id, action, details, created_at) VALUES (?, ?, ?, ?)",
+            (cursor.lastrowid, "admin.bootstrap", "Initial administrator account created", _now().isoformat()),
+        )
+
+
 def login_admin(username: str, password: str, request: Request, response: Response) -> dict:
     ip = request.client.host if request.client else "unknown"
     cutoff = (_now() - timedelta(minutes=10)).isoformat()
