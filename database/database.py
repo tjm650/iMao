@@ -18,7 +18,7 @@ def initialize_database(database_path: str | Path | None = None) -> None:
     schema = schema_path.read_text(encoding="utf-8")
     with connect(database_path) as connection:
         connection.executescript(schema)
-        # Additive migrations preserve data created by earlier iMao stages.
+        # Additive migrations preserve data created by earlier wiMao stages.
         session_columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
         session_migrations = {
             "session_token_hash": "TEXT",
