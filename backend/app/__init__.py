@@ -1,1 +1,1 @@
-"""iMao captive portal backend."""
+"""wiMao captive portal backend."""
