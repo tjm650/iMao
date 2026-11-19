@@ -105,16 +105,20 @@ def dashboard_summary() -> dict:
     with connect() as db:
         active_sessions = db.execute("SELECT COUNT(*) FROM sessions WHERE status='active'").fetchone()[0]
         active_admins = db.execute("SELECT COUNT(*) FROM admin_users WHERE is_active=1").fetchone()[0]
+        now = _now().isoformat()
         voucher_counts = db.execute(
             """SELECT COUNT(*) AS total,
-                      SUM(CASE WHEN redeemed_at IS NULL AND revoked_at IS NULL THEN 1 ELSE 0 END) AS available,
+                      SUM(CASE WHEN redeemed_at IS NULL AND revoked_at IS NULL
+                                    AND (expires_at IS NULL OR expires_at > ?) THEN 1 ELSE 0 END) AS available,
                       SUM(CASE WHEN redeemed_at IS NOT NULL THEN 1 ELSE 0 END) AS redeemed,
-                      SUM(CASE WHEN revoked_at IS NOT NULL THEN 1 ELSE 0 END) AS revoked
-               FROM vouchers"""
+                      SUM(CASE WHEN revoked_at IS NOT NULL THEN 1 ELSE 0 END) AS revoked,
+                      SUM(CASE WHEN redeemed_at IS NULL AND revoked_at IS NULL
+                                    AND expires_at IS NOT NULL AND expires_at <= ? THEN 1 ELSE 0 END) AS expired
+               FROM vouchers""", (now, now)
         ).fetchone()
         traffic = db.execute("SELECT COALESCE(SUM(used_bytes),0) FROM vouchers").fetchone()[0]
         return {"active_sessions": active_sessions, "active_admins": active_admins,
-                "vouchers": {k: int(voucher_counts[k] or 0) for k in ("total", "available", "redeemed", "revoked")},
+                "vouchers": {k: int(voucher_counts[k] or 0) for k in ("total", "available", "redeemed", "revoked", "expired")},
                 "recorded_usage_bytes": int(traffic)}
 
 
