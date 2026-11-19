@@ -18,17 +18,23 @@ def initialize_database(database_path: str | Path | None = None) -> None:
     schema = schema_path.read_text(encoding="utf-8")
     with connect(database_path) as connection:
         connection.executescript(schema)
-        # Additive migrations preserve databases created in earlier project stages.
-        columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
-        migrations = {
+        # Additive migrations preserve data created by earlier iMao stages.
+        session_columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
+        session_migrations = {
             "session_token_hash": "TEXT",
             "expires_at": "TEXT",
             "last_counter_up": "INTEGER",
             "last_counter_down": "INTEGER",
             "revocation_pending": "INTEGER NOT NULL DEFAULT 0",
         }
-        for name, definition in migrations.items():
-            if name not in columns:
+        for name, definition in session_migrations.items():
+            if name not in session_columns:
                 connection.execute(f"ALTER TABLE sessions ADD COLUMN {name} {definition}")
+        voucher_columns = {row["name"] for row in connection.execute("PRAGMA table_info(vouchers)")}
+        voucher_migrations = {"revoked_at": "TEXT", "batch_id": "INTEGER REFERENCES voucher_batches(id)"}
+        for name, definition in voucher_migrations.items():
+            if name not in voucher_columns:
+                connection.execute(f"ALTER TABLE vouchers ADD COLUMN {name} {definition}")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token_hash)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(status, expires_at)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_vouchers_batch ON vouchers(batch_id)")
