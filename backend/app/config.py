@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
 
     default_quota_mb: int = 500
-    session_poll_seconds: int = 10
+    session_poll_seconds: int = 2
     session_stale_minutes: int = 5
     session_max_hours: int = 12
 
