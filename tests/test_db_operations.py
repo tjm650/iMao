@@ -57,3 +57,13 @@ def test_backup_refuses_same_source_and_destination(tmp_path):
     _database(source, "value")
     with pytest.raises(ValueError, match="differ"):
         imao_db.backup(source, source)
+
+
+def test_restore_refuses_when_sqlite_sidecar_is_present(tmp_path):
+    source = tmp_path / "live.sqlite3"
+    snapshot = tmp_path / "snapshot.sqlite3"
+    _database(source, "original")
+    imao_db.backup(source, snapshot)
+    Path(str(source) + "-wal").write_bytes(b"stale")
+    with pytest.raises(RuntimeError, match="sidecar remains"):
+        imao_db.restore(snapshot, source, True)
