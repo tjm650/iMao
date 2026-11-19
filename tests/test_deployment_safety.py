@@ -23,8 +23,8 @@ def test_systemd_templates_have_expected_sections_and_hardening():
         if path.name.endswith(".service.example"):
             assert "Service" in unit
             service = unit["Service"]
-            assert service.get("User") == "imao"
-            assert service.get("Group") == "imao"
+            assert service.get("User") == "wimao"
+            assert service.get("Group") == "wimao"
             assert service.get("UMask") == "0077"
             assert service.get("ProtectSystem") == "strict"
             assert service.get("ProtectHome") == "true"
@@ -38,7 +38,7 @@ def test_systemd_templates_have_expected_sections_and_hardening():
 
 
 def test_api_service_binds_loopback_and_uses_limited_forwarded_headers():
-    unit = _unit(SYSTEMD / "imao.service.example")
+    unit = _unit(SYSTEMD / "wimao.service.example")
     command = unit["Service"]["ExecStart"]
     assert "--host 127.0.0.1" in command
     assert "--forwarded-allow-ips=127.0.0.1" in command
@@ -46,17 +46,17 @@ def test_api_service_binds_loopback_and_uses_limited_forwarded_headers():
 
 
 def test_firewall_rollback_is_scoped_and_confirmation_gated():
-    script = (ROOT / "scripts" / "imao-firewall.sh").read_text(encoding="utf-8")
+    script = (ROOT / "scripts" / "wimao-firewall.sh").read_text(encoding="utf-8")
     assert "nft flush ruleset" not in script
-    assert "nft delete table inet imao" in script
-    assert "nft delete table ip imao_nat" in script
+    assert "nft delete table inet wimao" in script
+    assert "nft delete table ip wimao_nat" in script
     assert '[[ "${FIREWALL_ENABLED:-false}" == "true" ]]' in script
     assert '[[ "${2:-}" == "--confirm" ]]' in script
     assert re.search(r"remove\).*?--confirm", script, re.S)
 
 
 def test_network_helper_uses_fixed_nft_binary_and_validates_client_subnet():
-    helper = (ROOT / "scripts" / "imao-netctl.py").read_text(encoding="utf-8")
+    helper = (ROOT / "scripts" / "wimao-netctl.py").read_text(encoding="utf-8")
     assert '["/usr/sbin/nft", *args]' in helper
     assert "ipaddress.IPv4Address(raw_ip)" in helper
     assert "address not in network" in helper
@@ -66,5 +66,5 @@ def test_network_helper_uses_fixed_nft_binary_and_validates_client_subnet():
 def test_recovery_runbook_warns_against_global_firewall_flush():
     runbook = (ROOT / "docs" / "OPERATIONS-RECOVERY.md").read_text(encoding="utf-8")
     assert "nft flush ruleset" in runbook
-    assert "sudo scripts/imao-firewall.sh remove --confirm" in runbook
+    assert "sudo scripts/wimao-firewall.sh remove --confirm" in runbook
     assert "local console" in runbook.lower()
