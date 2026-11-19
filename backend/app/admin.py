@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -88,6 +89,7 @@ def require_admin(request: Request) -> dict:
 
 
 def logout_admin(request: Request, response: Response) -> dict:
+    _validate_same_origin(request)
     token = request.cookies.get(COOKIE_NAME)
     if token:
         with connect() as db:
@@ -197,7 +199,20 @@ ROLE_PERMISSIONS = {
 }
 
 
+
+def _validate_same_origin(request: Request) -> None:
+    origin = request.headers.get("origin")
+    if not origin:
+        raise HTTPException(status_code=403, detail="Missing request origin")
+    supplied = urlsplit(origin)
+    expected = urlsplit(str(request.base_url))
+    if supplied.scheme != expected.scheme or supplied.netloc != expected.netloc:
+        raise HTTPException(status_code=403, detail="Cross-origin administrator request rejected")
+
+
 def require_permission(request: Request, permission: str) -> dict:
+    if request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
+        _validate_same_origin(request)
     admin = require_admin(request)
     if permission not in ROLE_PERMISSIONS.get(admin["role"], set()):
         raise HTTPException(status_code=403, detail="Your administrator role does not permit this action")
