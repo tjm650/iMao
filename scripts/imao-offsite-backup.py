@@ -3,9 +3,9 @@
 
 Required environment:
   BACKUP_AGE_RECIPIENT       age public recipient (never a private key)
-  BACKUP_RCLONE_DESTINATION rclone destination directory, e.g. cryptremote:imao
+  BACKUP_RCLONE_DESTINATION rclone destination directory, e.g. cryptremote:wimao
 Optional:
-  DATABASE_PATH             live SQLite path (default: ./database/imao.sqlite3)
+  DATABASE_PATH             live SQLite path (default: ./database/wimao.sqlite3)
   BACKUP_PYTHON             Python executable used for the local backup (default: current interpreter)
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DB_TOOL = ROOT / "scripts" / "imao-db.py"
+DB_TOOL = ROOT / "scripts" / "wimao-db.py"
 
 
 def required(name: str) -> str:
@@ -45,16 +45,16 @@ def main() -> int:
         if not age or not rclone:
             raise RuntimeError("Both age and rclone must be installed and available on PATH")
 
-        database = Path(os.environ.get("DATABASE_PATH", "./database/imao.sqlite3")).expanduser()
+        database = Path(os.environ.get("DATABASE_PATH", "./database/wimao.sqlite3")).expanduser()
         python = os.environ.get("BACKUP_PYTHON", sys.executable)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        filename = f"imao-{stamp}.sqlite3.age"
+        filename = f"wimao-{stamp}.sqlite3.age"
         remote_file = f"{destination}/{filename}"
 
-        with tempfile.TemporaryDirectory(prefix="imao-backup-") as work:
+        with tempfile.TemporaryDirectory(prefix="wimao-backup-") as work:
             os.chmod(work, 0o700)
             workdir = Path(work)
-            plaintext = workdir / f"imao-{stamp}.sqlite3"
+            plaintext = workdir / f"wimao-{stamp}.sqlite3"
             encrypted = workdir / filename
 
             run([python, str(DB_TOOL), "--database", str(database), "backup", "--output", str(plaintext)])
@@ -66,7 +66,7 @@ def main() -> int:
         print(f"Encrypted backup uploaded and checked: {remote_file}")
         return 0
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
-        print(f"iMao off-site backup failed: {exc}", file=sys.stderr)
+        print(f"wiMao off-site backup failed: {exc}", file=sys.stderr)
         return 1
 
 
