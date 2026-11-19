@@ -477,6 +477,82 @@ sudo systemctl status imao --no-pager
 
 When the live database exists, the restore utility first creates and verifies a timestamped `.pre-restore-*` safety copy beside it. It then restores through a temporary file and atomic replacement. Do not restore while iMao is running or while another process is writing to the database. Store backups outside the web root, restrict access, encrypt off-host copies and periodically test restoration. A local backup alone does not protect against disk loss or theft.
 
+### Automated encrypted off-site backups
+
+The repository includes `scripts/imao-offsite-backup.py` and a daily systemd service/timer template. Each run:
+1. Uses the SQLite online-backup utility to create a consistent snapshot.
+2. Encrypts the snapshot with `age` using a public recipient key.
+3. Uploads only the encrypted artifact through a configured `rclone` remote.
+4. Runs `rclone check` against the uploaded object.
+5. Removes its temporary plaintext and encrypted staging files when the run exits.
+
+The gateway needs the `age` and `rclone` executables, a configured rclone remote, and the age *public recipient*. The age private identity is for recovery and should be stored offline or in a separate secure recovery location, never on the gateway. Prefer a dedicated rclone remote with server-side access restricted to the backup path. The remote should not be mounted as a public web directory.
+
+Create a protected backup environment file at `/etc/imao/backup.env`:
+
+~~~dotenv
+BACKUP_AGE_RECIPIENT=age1REPLACE_WITH_YOUR_PUBLIC_RECIPIENT
+BACKUP_RCLONE_DESTINATION=backupremote:imao
+~~~
+
+Configure the rclone remote in `/etc/imao/rclone.conf`; it may contain provider credentials and must be protected. The service template points rclone to that exact file. Set ownership and permissions so only root and the iMao service account can read the configuration, for example:
+
+~~~bash
+sudo chown root:imao /etc/imao/backup.env /etc/imao/rclone.conf
+sudo chmod 0640 /etc/imao/backup.env /etc/imao/rclone.conf
+~~~
+
+Install `age` and `rclone` from trusted distribution/vendor sources. The backup service also reads `/etc/imao/imao.env` for `DATABASE_PATH`. Do not put age private keys or plaintext provider passwords in the repository, application database, command history or logs.
+
+The timer template is daily with a randomized delay and persistent catch-up after downtime. For an explicitly approved Linux deployment, review and install the unit files:
+
+~~~bash
+sudo install -o root -g root -m 0644 config/systemd/imao-offsite-backup.service.example /etc/systemd/system/imao-offsite-backup.service
+sudo install -o root -g root -m 0644 config/systemd/imao-offsite-backup.timer.example /etc/systemd/system/imao-offsite-backup.timer
+sudo systemd-analyze verify /etc/systemd/system/imao-offsite-backup.service /etc/systemd/system/imao-offsite-backup.timer
+~~~
+
+A manual backup run can then be tested with `sudo systemctl start imao-offsite-backup.service`, followed by `sudo systemctl status imao-offsite-backup.service` and `sudo journalctl -u imao-offsite-backup.service`. Only after verifying the remote artifact and recovery key should an operator enable the timer with `sudo systemctl enable --now imao-offsite-backup.timer`. These are future gateway-operator commands; no timer is installed or enabled by repository development.
+
+**Retention is intentionally not automated yet.** Configure retention/lifecycle rules on the remote storage after deciding the required recovery-point and retention policy. Keep multiple generations and test restore before deleting old backups.
+
+### Monitoring and alert delivery
+
+The `scripts/imao-monitor.py` utility checks both `/health` and `/ready`, with bounded request timeouts. It exits non-zero on failure and sends a short generic alert only when `IMAO_ALERT_WEBHOOK` is configured. The webhook payload uses a Slack-compatible JSON `text` field; do not point it at an endpoint that cannot accept that format. Alert messages do not include voucher codes, database contents, client addresses or response bodies.
+
+Create a protected `/etc/imao/monitor.env` file:
+
+~~~dotenv
+IMAO_MONITOR_BASE_URL=http://127.0.0.1:8000
+IMAO_MONITOR_TIMEOUT_SECONDS=5
+IMAO_ALERT_WEBHOOK=
+~~~
+
+Keep the webhook URL secret and set file permissions to root/service-account read only. If no webhook is configured, failed checks are still logged and the monitor exits non-zero, but no external notification is delivered.
+
+For an explicitly approved Linux deployment, install and validate the monitor service and timer templates:
+
+~~~bash
+sudo install -o root -g root -m 0644 config/systemd/imao-monitor.service.example /etc/systemd/system/imao-monitor.service
+sudo install -o root -g root -m 0644 config/systemd/imao-monitor.timer.example /etc/systemd/system/imao-monitor.timer
+sudo systemd-analyze verify /etc/systemd/system/imao-monitor.service /etc/systemd/system/imao-monitor.timer
+~~~
+
+After reviewing the destination and test-alert policy, a one-time check can be run with `sudo systemctl start imao-monitor.service`. Inspect `sudo systemctl status imao-monitor.service` and `sudo journalctl -u imao-monitor.service`. Enable periodic checks only after approval with `sudo systemctl enable --now imao-monitor.timer`. The timer is configured to run every five minutes after boot. It does not configure a monitoring vendor or create an external webhook for you.
+
+### Restore drill and recovery validation
+
+A backup is not considered operational until it has been restored and checked. For a non-production drill, download a selected encrypted backup from the configured remote, decrypt it using the offline recovery identity, verify its integrity, then restore it to a separate temporary database path:
+
+~~~bash
+age --decrypt --identity /secure/offline/imao-backup-identity.txt --output /tmp/imao-restore-drill.sqlite3 /secure/restore/imao-backup.sqlite3.age
+python scripts/imao-db.py verify /tmp/imao-restore-drill.sqlite3
+python scripts/imao-db.py --database /tmp/imao-restore-drill-target.sqlite3 restore /tmp/imao-restore-drill.sqlite3 --confirm
+python scripts/imao-db.py verify /tmp/imao-restore-drill-target.sqlite3
+~~~
+
+Use a restricted maintenance environment and remove the temporary plaintext databases securely after the drill. Do not perform a drill against the production database path. Confirm that expected voucher, administrator and audit records are present using an approved, access-controlled inspection procedure. Session rows may have expired by the time a backup is restored and should not be treated as proof that network clients are still authorized. A restored database does not restore nftables state or recreate live network authorizations.
+
 ### systemd deployment template (future gateway operation)
 
 `config/systemd/imao.service.example` is a reviewable service template, not an installed service. It assumes:
@@ -510,7 +586,7 @@ Before production use, an operator must:
 5. Document recovery access, service restart order, network rollback and certificate renewal checks.
 6. Test power loss, disk-full behavior, database corruption handling and recovery on the target Linux distribution.
 
-The current repository does not configure a monitoring provider, backup schedule, remote alert destination or gateway host. Those remain explicit deployment tasks.
+The repository now provides daily encrypted off-site backup and five-minute monitoring timer templates, but neither is installed or enabled. The operator must supply and secure the remote-storage configuration, age recovery identity, webhook destination, retention policy and deployment approval. External monitoring-provider integration and target-host disaster-recovery exercises remain pending.
 
 ## Roadmap
 
