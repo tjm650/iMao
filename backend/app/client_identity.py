@@ -20,7 +20,7 @@ def resolve_client_identity(request: Request) -> tuple[str, str]:
         raise HTTPException(status_code=503, detail="Hotspot network is not configured") from exc
 
     if address not in network or address.is_unspecified or address.is_loopback:
-        raise HTTPException(status_code=403, detail="Connect through the iMao Wi-Fi network")
+        raise HTTPException(status_code=403, detail="Connect through the wiMao Wi-Fi network")
 
     interface = settings.hotspot_interface
     if not interface or interface.startswith("REPLACE_"):
