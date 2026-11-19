@@ -25,7 +25,7 @@ from database.database import connect, initialize_database
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-app = FastAPI(title="iMao Captive Portal", version="0.4.0")
+app = FastAPI(title="wiMao Captive Portal", version="0.4.0")
 FRONTEND_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "login"
 if FRONTEND_ROOT.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_ROOT), name="portal-static")
@@ -70,7 +70,7 @@ async def _accounting_loop() -> None:
             await asyncio.to_thread(expire_sessions)
             await asyncio.to_thread(retry_pending_revocations)
         except Exception:
-            logger.exception("iMao accounting cycle failed")
+            logger.exception("wiMao accounting cycle failed")
         await asyncio.sleep(max(2, settings.session_poll_seconds))
 
 
@@ -154,7 +154,7 @@ def captive_portal_api(request: Request):
 @app.get("/health")
 def health() -> dict[str, str]:
     """Liveness probe: confirms that the ASGI process is responding."""
-    return {"status": "ok", "service": "imao"}
+    return {"status": "ok", "service": "wimao"}
 
 
 @app.get("/ready")
@@ -172,9 +172,9 @@ def readiness():
         if not required.issubset(tables):
             raise RuntimeError("Required database tables are missing")
     except Exception:
-        logger.exception("iMao readiness check failed")
-        return JSONResponse({"status": "not_ready", "service": "imao"}, status_code=503)
-    return {"status": "ready", "service": "imao"}
+        logger.exception("wiMao readiness check failed")
+        return JSONResponse({"status": "not_ready", "service": "wimao"}, status_code=503)
+    return {"status": "ready", "service": "wimao"}
 
 
 @app.get("/", include_in_schema=False)
@@ -335,13 +335,13 @@ def admin_voucher_export(request: Request, status: str | None = None):
                          round(item["used_bytes"] / 1048576, 2), item["expires_at"] or "",
                          item["created_at"], item["redeemed_at"] or "", item["revoked_at"] or ""])
     return Response(output.getvalue(), media_type="text/csv",
-                    headers={"Content-Disposition": 'attachment; filename="imao-vouchers.csv"',
+                    headers={"Content-Disposition": 'attachment; filename="wimao-vouchers.csv"',
                              "Cache-Control": "no-store"})
 
 
 @app.get("/api/config")
 def public_config() -> dict[str, int | str]:
-    return {"service": "iMao", "default_quota_mb": settings.default_quota_mb}
+    return {"service": "wiMao", "default_quota_mb": settings.default_quota_mb}
 
 
 @app.post("/api/auth/voucher")
