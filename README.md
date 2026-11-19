@@ -26,7 +26,7 @@ Still pending:
 - Verification of actual nftables JSON/counter behavior on target distributions
 - Hard byte-exact quota enforcement (polling-based enforcement can exceed the limit between polls and during in-flight packets)
 - Reliable hostapd/dnsmasq setup, static hotspot address management and service lifecycle/rollback
-- Captive portal detection and polished client experience
+- OS captive-portal probe handlers (Android, Apple, Windows and Firefox) and RFC 8908 captive-state API foundation
 - Complete administration dashboard, voucher management, reporting, production deployment, monitoring and recovery testing
 
 ## Requirements
@@ -318,8 +318,21 @@ When explicitly enabled on a prepared gateway:
 
 **Quota precision:** accounting polls every two seconds by default. Some extra data can pass between polls or while packets are in flight. Usage is capped in the database at the voucher allowance, and forwarding is revoked when the worker observes exhaustion. This is not byte-exact real-time enforcement yet.
 
-## API endpoints
+## Captive portal detection
 
+iMao now provides HTTP probe handlers for common operating-system checks. Unauthenticated clients receive an HTTP 302 redirect to the voucher portal; active clients receive the platform's expected online response. These handlers support probe-based detection and must be reached through the eventual gateway's HTTP interception/redirect rules. They do not intercept HTTPS.
+
+- Android: `/generate_204` and `/gen_204` return HTTP 204 for authorized clients.
+- Apple iOS/macOS: `/hotspot-detect.html` returns a small HTML page containing `Success`.
+- Windows: `/connecttest.txt` returns `Microsoft Connect Test`; legacy `/ncsi.txt` returns `Microsoft NCSI`.
+- Firefox: `/success.txt` and `/canonical.html` return `success`.
+- RFC 8908: `/api/captive-portal` returns the per-client `captive` boolean using the `application/captive+json` media type.
+
+The RFC 8908 API currently omits `user-portal-url` because iMao does not yet have a configured public HTTPS portal origin. RFC 8910 DHCP option 114 must advertise the HTTPS API URI, not a plain HTTP page; the dnsmasq template is documented but deliberately not enabled until TLS/domain configuration is implemented. Probe handlers alone do not make a gateway captive: later deployment work must route relevant HTTP probes to iMao and provide a secure portal/API origin for RFC 8910-capable clients.
+
+
+- GET /api/captive-portal — RFC 8908 captive-state API
+- GET /generate_204, /hotspot-detect.html, /connecttest.txt — OS connectivity probes
 - GET /health — application health check
 - GET / — voucher portal
 - POST /api/auth/voucher — redeem a voucher
@@ -343,6 +356,6 @@ When explicitly enabled on a prepared gateway:
 2. Voucher authentication and session foundation
 3. Host network discovery, AP/DHCP/DNS templates and isolated nftables policy (target-host validation pending)
 4. Privileged session authorization bridge, per-client traffic accounting and quota enforcement (implementation committed; target-host validation pending)
-5. Captive portal detection and client experience
+5. Captive portal detection and client experience (probe handlers/API foundation implemented; gateway interception and TLS discovery remain pending)
 6. Admin dashboard, voucher batches and reports
 7. systemd deployment, recovery and security testing
