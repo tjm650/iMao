@@ -65,7 +65,7 @@ def login_admin(username: str, password: str, request: Request, response: Respon
         db.execute("INSERT INTO audit_logs (admin_user_id, action, details, created_at) VALUES (?, ?, ?, ?)",
                    (row["id"], "admin.login", "Administrator signed in", _now().isoformat()))
     response.set_cookie(COOKIE_NAME, token, httponly=True, secure=request.url.scheme == "https",
-                        samesite="strict", path="/admin", max_age=SESSION_HOURS * 3600)
+                        samesite="strict", path="/", max_age=SESSION_HOURS * 3600)
     return {"status": "authenticated", "username": username.strip(), "expires_at": expires.isoformat()}
 
 
@@ -95,7 +95,7 @@ def logout_admin(request: Request, response: Response) -> dict:
             if row:
                 db.execute("INSERT INTO audit_logs (admin_user_id, action, details, created_at) VALUES (?, ?, ?, ?)",
                            (row["admin_user_id"], "admin.logout", "Administrator signed out", _now().isoformat()))
-    response.delete_cookie(COOKIE_NAME, path="/admin", httponly=True, samesite="strict")
+    response.delete_cookie(COOKIE_NAME, path="/", httponly=True, samesite="strict")
     return {"status": "logged_out"}
 
 
@@ -121,6 +121,14 @@ def create_voucher_batch(admin_id: int, count: int, quota_bytes: int, expires_at
         raise HTTPException(status_code=422, detail="Batch size must be between 1 and 500")
     if quota_bytes <= 0:
         raise HTTPException(status_code=422, detail="Quota must be greater than zero")
+    if expires_at:
+        try:
+            expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if expiry.tzinfo is None or expiry <= _now():
+                raise ValueError("Expiry must be a future timezone-aware timestamp")
+            expires_at = expiry.astimezone(timezone.utc).isoformat()
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Expiry must be a future ISO-8601 timestamp with a timezone") from exc
     from backend.app.vouchers import generate_voucher_code, hash_voucher
     codes = [generate_voucher_code() for _ in range(count)]
     now = _now().isoformat()
