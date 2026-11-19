@@ -28,15 +28,19 @@ Still pending:
 - Verification of actual nftables JSON/counter behavior on target distributions
 - Hard byte-exact quota enforcement (polling-based enforcement can exceed the limit between polls and during in-flight packets)
 - Reliable hostapd/dnsmasq setup, static hotspot address management and service lifecycle/rollback
-- Expanded administration roles/permissions, voucher export/printing, richer reporting, production deployment, monitoring and recovery testing
+- Target-host validation of the systemd template, monitoring probes and backup/restore process
+- Production security review, external monitoring, off-host encrypted backup scheduling and disaster-recovery exercise
+- Payment ledger and transaction capture before trustworthy revenue reporting can be added
 
 ## Requirements
 
 ### Development computer
-- Linux, preferably a current Ubuntu or Debian release
+- Windows, Linux or macOS
 - Python 3.10 or newer
 - Git
 - Internet access to install Python dependencies
+
+A Linux installation is not required for ordinary application development or automated Python tests. Linux is required only when preparing and validating the eventual gateway host/network integration.
 
 ### Eventual gateway computer
 - Linux (Ubuntu/Debian instructions below)
@@ -52,7 +56,7 @@ The development computer and gateway can be the same Linux computer. Do not assu
 
 # Linux terminal command reference
 
-The following is the command checklist for the person installing or developing iMao. Run commands from a Linux terminal. Commands that change host networking or firewall state are clearly marked as later deployment operations and should not be run during ordinary application development.
+The following is the Linux command checklist for the eventual gateway operator. It is not a requirement for Windows-based application development. Commands that change host networking or firewall state are clearly marked as later deployment operations and should not be run during ordinary application development.
 
 ## A. Prepare a Linux computer
 
@@ -514,5 +518,5 @@ The current repository does not configure a monitoring provider, backup schedule
 3. Host network discovery, AP/DHCP/DNS templates and isolated nftables policy (target-host validation pending)
 4. Privileged session authorization bridge, per-client traffic accounting and quota enforcement (implementation committed; target-host validation pending)
 5. Captive portal detection and client experience (HTTP interception, optional Caddy TLS template and DHCPv4 option 114 renderer implemented; deployment validation and IPv6 support pending)
-6. Admin dashboard, role-based access, voucher batches, exports and usage reports
+6. Admin dashboard, role-based access, voucher batches, exports and usage reports (implemented; target-host validation pending)
 7. Deployment readiness, monitoring probes, SQLite backup/restore tooling and hardened systemd template (implementation started; target-host validation pending)
