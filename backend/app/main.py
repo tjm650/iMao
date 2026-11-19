@@ -11,8 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.app.accounting import account_active_sessions, expire_sessions, retry_pending_revocations
-from backend.app.admin import (create_voucher_batch, dashboard_summary, list_admins, list_vouchers, login_admin,
-                               logout_admin, require_admin, require_permission, revoke_voucher, update_admin_access, usage_report)
+from backend.app.admin import (
+    create_voucher_batch, dashboard_summary, list_admins, list_vouchers, login_admin,
+    logout_admin, require_admin, require_permission, revoke_voucher,
+    update_admin_access, usage_report,
+)
 from backend.app.auth import authenticate_voucher, current_session, logout_session
 from backend.app.config import get_settings
 from backend.app.captive_portal import client_is_authorized
@@ -47,6 +50,11 @@ class VoucherBatchRequest(BaseModel):
     quota_mb: int = Field(default=500, ge=1, le=1048576)
     expires_at: str | None = None
     label: str | None = Field(default=None, max_length=100)
+
+
+class AdminAccessUpdate(BaseModel):
+    role: str = Field(pattern="^(admin|manager|operator|viewer)$")
+    is_active: bool = True
 
 
 async def _accounting_loop() -> None:
@@ -84,7 +92,8 @@ def _probe_response(request: Request, platform: str) -> Response:
     authorized = client_is_authorized(client_ip)
     headers = {"Cache-Control": "no-store, private", "Pragma": "no-cache"}
     if not authorized:
-        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"), status_code=302, headers=headers)
+        target = settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"
+        return RedirectResponse(url=target, status_code=302, headers=headers)
     if platform == "android":
         return Response(status_code=204, headers=headers)
     if platform == "apple":
@@ -183,33 +192,34 @@ def admin_logout(request: Request, response: Response):
 
 @app.get("/api/admin/summary")
 def admin_summary(request: Request):
-    require_permission(request, 'dashboard:read')
+    require_permission(request, "dashboard:read")
     return dashboard_summary()
 
 
 @app.get("/api/admin/vouchers")
 def admin_vouchers(request: Request, limit: int = 100, offset: int = 0, status: str | None = None):
-    require_permission(request, 'voucher:read')
+    require_permission(request, "voucher:read")
     return list_vouchers(limit, offset, status)
 
 
 @app.post("/api/admin/vouchers/batches")
 def admin_create_batch(payload: VoucherBatchRequest, request: Request):
-    admin = require_permission(request, 'voucher:create')
-    return {"count": len(codes := create_voucher_batch(admin["id"], payload.count, megabytes_to_bytes(payload.quota_mb),
-                                                         payload.expires_at, payload.label)), "codes": codes}
+    admin = require_permission(request, "voucher:create")
+    codes = create_voucher_batch(admin["id"], payload.count, megabytes_to_bytes(payload.quota_mb),
+                                 payload.expires_at, payload.label)
+    return {"count": len(codes), "codes": codes}
 
 
 @app.post("/api/admin/vouchers/{voucher_id}/revoke")
 def admin_revoke_voucher(voucher_id: int, request: Request):
-    admin = require_permission(request, 'voucher:revoke')
+    admin = require_permission(request, "voucher:revoke")
     revoke_voucher(admin["id"], voucher_id)
     return {"status": "revoked"}
 
 
 @app.get("/api/admin/sessions")
 def admin_sessions(request: Request, limit: int = 100, offset: int = 0):
-    require_permission(request, 'reports:read')
+    require_permission(request, "reports:read")
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
     with connect() as db:
@@ -225,7 +235,7 @@ def admin_sessions(request: Request, limit: int = 100, offset: int = 0):
 
 @app.get("/api/admin/audit")
 def admin_audit(request: Request, limit: int = 100):
-    require_permission(request, 'audit:read')
+    require_permission(request, "audit:read")
     with connect() as db:
         rows = db.execute(
             """SELECT l.id, a.username, l.action, l.details, l.created_at
@@ -235,73 +245,46 @@ def admin_audit(request: Request, limit: int = 100):
     return {"items": [dict(row) for row in rows]}
 
 
-class AdminAccessUpdate(BaseModel):
-    role: str = Field(pattern='^(admin|manager|operator|viewer)
-def public_config() -> dict[str, int | str]:
-    return {"service": "iMao", "default_quota_mb": settings.default_quota_mb}
-
-
-@app.post("/api/auth/voucher")
-def voucher_login(payload: VoucherLogin, request: Request, response: Response):
-    return authenticate_voucher(request, response, payload.code)
-
-
-@app.get("/api/session")
-def session_status(request: Request):
-    return current_session(request)
-
-
-@app.post("/api/logout")
-def logout(request: Request, response: Response):
-    return logout_session(request, response)
-
-
-@app.api_route("/{path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], include_in_schema=False)
-def captive_fallback(request: Request, path: str):
-    client_ip = request.client.host if request.client else ""
-    if not client_is_authorized(client_ip):
-        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"),
-                                status_code=303, headers={"Cache-Control": "no-store"})
-    return JSONResponse({"detail": "Not found"}, status_code=404)
-)
-    is_active: bool = True
-
-
-@app.get('/api/admin/admins')
+@app.get("/api/admin/admins")
 def admin_list(request: Request):
-    require_permission(request, 'admins:manage')
-    return {'items': list_admins()}
+    require_permission(request, "admins:manage")
+    return {"items": list_admins()}
 
 
-@app.put('/api/admin/admins/{admin_id}')
+@app.put("/api/admin/admins/{admin_id}")
 def admin_update(admin_id: int, payload: AdminAccessUpdate, request: Request):
-    actor = require_permission(request, 'admins:manage')
-    update_admin_access(actor['id'], admin_id, payload.role, payload.is_active)
-    return {'status': 'updated'}
+    actor = require_permission(request, "admins:manage")
+    update_admin_access(actor["id"], admin_id, payload.role, payload.is_active)
+    return {"status": "updated"}
 
 
-@app.get('/api/admin/reports/usage')
+@app.get("/api/admin/reports/usage")
 def admin_usage_report(request: Request, start_date: str | None = None, end_date: str | None = None):
-    require_permission(request, 'reports:read')
+    require_permission(request, "reports:read")
     return usage_report(start_date, end_date)
 
 
-@app.get('/api/admin/vouchers/export.csv')
+@app.get("/api/admin/vouchers/export.csv")
 def admin_voucher_export(request: Request, status: str | None = None):
-    require_permission(request, 'voucher:read')
+    require_permission(request, "voucher:read")
     first = list_vouchers(limit=200, offset=0, status=status)
-    items = list(first['items'])
-    for offset in range(200, first['total'], 200):
-        items.extend(list_vouchers(limit=200, offset=offset, status=status)['items'])
+    items = list(first["items"])
+    for offset in range(200, first["total"], 200):
+        items.extend(list_vouchers(limit=200, offset=offset, status=status)["items"])
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Voucher ID', 'Batch', 'Quota MB', 'Used MB', 'Expires At', 'Created At', 'Redeemed At', 'Revoked At'])
+    writer.writerow(["Voucher ID", "Batch", "Quota MB", "Used MB", "Expires At", "Created At", "Redeemed At", "Revoked At"])
     for item in items:
-        writer.writerow([item['id'], item['batch_label'] or '', round(item['quota_bytes'] / 1048576, 2),
-                         round(item['used_bytes'] / 1048576, 2), item['expires_at'] or '',
-                         item['created_at'], item['redeemed_at'] or '', item['revoked_at'] or ''])
-    return Response(output.getvalue(), media_type='text/csv',
-                    headers={'Content-Disposition': 'attachment; filename=imao-vouchers.csv', 'Cache-Control': 'no-store'})
+        label = item["batch_label"] or ""
+        if label.startswith(("=", "+", "-", "@", "\t", "\r")):
+            label = "'" + label
+        writer.writerow([item["id"], label, round(item["quota_bytes"] / 1048576, 2),
+                         round(item["used_bytes"] / 1048576, 2), item["expires_at"] or "",
+                         item["created_at"], item["redeemed_at"] or "", item["revoked_at"] or ""])
+    return Response(output.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="imao-vouchers.csv"',
+                             "Cache-Control": "no-store"})
+
 
 @app.get("/api/config")
 def public_config() -> dict[str, int | str]:
@@ -327,6 +310,6 @@ def logout(request: Request, response: Response):
 def captive_fallback(request: Request, path: str):
     client_ip = request.client.host if request.client else ""
     if not client_is_authorized(client_ip):
-        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"),
-                                status_code=303, headers={"Cache-Control": "no-store"})
+        target = settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"
+        return RedirectResponse(url=target, status_code=303, headers={"Cache-Control": "no-store"})
     return JSONResponse({"detail": "Not found"}, status_code=404)
