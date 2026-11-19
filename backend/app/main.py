@@ -6,7 +6,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -234,6 +234,71 @@ def admin_audit(request: Request, limit: int = 100):
         ).fetchall()
     return {"items": [dict(row) for row in rows]}
 
+
+class AdminAccessUpdate(BaseModel):
+    role: str = Field(pattern='^(admin|manager|operator|viewer)
+def public_config() -> dict[str, int | str]:
+    return {"service": "iMao", "default_quota_mb": settings.default_quota_mb}
+
+
+@app.post("/api/auth/voucher")
+def voucher_login(payload: VoucherLogin, request: Request, response: Response):
+    return authenticate_voucher(request, response, payload.code)
+
+
+@app.get("/api/session")
+def session_status(request: Request):
+    return current_session(request)
+
+
+@app.post("/api/logout")
+def logout(request: Request, response: Response):
+    return logout_session(request, response)
+
+
+@app.api_route("/{path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], include_in_schema=False)
+def captive_fallback(request: Request, path: str):
+    client_ip = request.client.host if request.client else ""
+    if not client_is_authorized(client_ip):
+        return RedirectResponse(url=(settings.portal_public_url.rstrip("/") + "/" if settings.portal_public_url else "/"),
+                                status_code=303, headers={"Cache-Control": "no-store"})
+    return JSONResponse({"detail": "Not found"}, status_code=404)
+)
+    is_active: bool = True
+
+
+@app.get('/api/admin/admins')
+def admin_list(request: Request):
+    require_permission(request, 'admins:manage')
+    return {'items': list_admins()}
+
+
+@app.put('/api/admin/admins/{admin_id}')
+def admin_update(admin_id: int, payload: AdminAccessUpdate, request: Request):
+    actor = require_permission(request, 'admins:manage')
+    update_admin_access(actor['id'], admin_id, payload.role, payload.is_active)
+    return {'status': 'updated'}
+
+
+@app.get('/api/admin/reports/usage')
+def admin_usage_report(request: Request, start_date: str | None = None, end_date: str | None = None):
+    require_permission(request, 'reports:read')
+    return usage_report(start_date, end_date)
+
+
+@app.get('/api/admin/vouchers/export.csv')
+def admin_voucher_export(request: Request, status: str | None = None):
+    require_permission(request, 'voucher:read')
+    result = list_vouchers(limit=200, offset=0, status=status)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Voucher ID', 'Batch', 'Quota MB', 'Used MB', 'Expires At', 'Created At', 'Redeemed At', 'Revoked At'])
+    for item in result['items']:
+        writer.writerow([item['id'], item['batch_label'] or '', round(item['quota_bytes'] / 1048576, 2),
+                         round(item['used_bytes'] / 1048576, 2), item['expires_at'] or '',
+                         item['created_at'], item['redeemed_at'] or '', item['revoked_at'] or ''])
+    return Response(output.getvalue(), media_type='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=imao-vouchers.csv', 'Cache-Control': 'no-store'})
 
 @app.get("/api/config")
 def public_config() -> dict[str, int | str]:
