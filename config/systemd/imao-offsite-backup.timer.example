@@ -1,11 +1,11 @@
 [Unit]
-Description=Daily iMao encrypted off-site backup schedule
+Description=Daily wiMao encrypted off-site backup schedule
 
 [Timer]
 OnCalendar=daily
 RandomizedDelaySec=30m
 Persistent=true
-Unit=imao-offsite-backup.service
+Unit=wimao-offsite-backup.service
 
 [Install]
 WantedBy=timers.target
