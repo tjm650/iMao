@@ -275,6 +275,38 @@ sudo visudo -c
 
 Set the real hotspot_interface and hotspot_cidr in that JSON file. Do not make it writable by the API service account.
 
+
+### Install and configure Caddy for the public HTTPS portal (deployment only)
+
+Only do this after setting `PORTAL_PUBLIC_URL` to a DNS hostname you control, confirming that its public DNS A record points to the gateway's public IP, and arranging inbound TCP 80 and 443 to reach the gateway. The official Debian/Ubuntu package automatically starts a systemd service named `caddy`; do not run these commands during ordinary development.
+
+~~~bash
+sudo apt install --yes debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+sudo chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update
+sudo apt install caddy
+~~~
+
+After the iMao renderer has produced `runtime-config/Caddyfile`, install that configuration and validate it:
+
+~~~bash
+sudo cp runtime-config/Caddyfile /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+sudo systemctl status caddy --no-pager
+~~~
+
+Inspect Caddy certificate or reverse-proxy issues:
+
+~~~bash
+sudo journalctl -u caddy -n 100 --no-pager
+~~~
+
+Caddy can only obtain a publicly trusted certificate when its ACME challenge can reach the gateway. Do not disable certificate validation or use a self-signed certificate for the RFC 8908 API.
+
 ### Firewall activation is a separate, high-impact step
 
 **Do not run this until the generated rules, interface names, address plan and rollback procedure have been reviewed.** The firewall script changes only the dedicated iMao tables, but a wrong interface or subnet can still interrupt hotspot connectivity.
