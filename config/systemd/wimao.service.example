@@ -1,0 +1,40 @@
+[Unit]
+Description=wwiMao captive portal and voucher manager
+Documentation=https://github.com/tjm650/wwiMao
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=wwimao
+Group=wwimao
+WorkingDirectory=/opt/wwimao
+EnvironmentFile=/etc/wwimao/wwimao.env
+# Safe default: loopback only. Change deliberately after reviewing the gateway
+# listener, Caddy proxy and firewall design.
+ExecStart=/opt/wwimao/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0077
+
+# The restricted netctl helper is invoked through a narrow sudoers rule.
+# Keep sudoers limited to /usr/local/sbin/wwimao-netctl and review this trade-off.
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StateDirectory=wwimao
+StateDirectoryMode=0750
+ReadWritePaths=/var/lib/wwimao
+
+[Install]
+WantedBy=multi-user.target
