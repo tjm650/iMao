@@ -14,13 +14,14 @@ from database.database import initialize_database
 def main():
     parser = argparse.ArgumentParser(description="Create an iMao administrator account")
     parser.add_argument("--username", required=True)
+    parser.add_argument("--role", choices=["admin", "manager", "operator", "viewer"], default="admin")
     args = parser.parse_args()
     password = getpass.getpass("Administrator password (12+ characters): ")
     confirmation = getpass.getpass("Confirm password: ")
     if password != confirmation:
         parser.error("Passwords do not match")
     initialize_database()
-    create_admin(args.username, password)
+    create_admin(args.username, password, args.role)
     print(f"Administrator '{args.username}' created.")
 
 
