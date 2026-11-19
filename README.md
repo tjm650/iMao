@@ -371,7 +371,13 @@ For gateway deployment, set `PORTAL_PUBLIC_URL=https://portal.example.com` in th
 - Advertises `https://portal.example.com/api/captive-portal` through DHCPv4 option 114. This MUST be the RFC 8908 API URI, not the user-facing portal URL.
 - Returns `user-portal-url` from the RFC 8908 API.
 
-The generated Caddyfile is a deployment template; Caddy is not installed or started automatically. In production, FastAPI must listen on the gateway interfaces so the local nftables HTTP redirect can reach it; the generated input policy blocks the raw FastAPI port from the upstream interface, while Caddy proxies to `127.0.0.1`. Configure Uvicorn to trust forwarded headers only from loopback (for example, `--proxy-headers --forwarded-allow-ips=127.0.0.1`) so the API can identify hotspot client addresses without trusting arbitrary forwarded headers. Set `COOKIE_SECURE=true` when using HTTPS; the renderer refuses to generate public-portal configuration if this is disabled.
+The generated Caddyfile is a deployment template; Caddy is not installed or started automatically. In production, FastAPI must listen on the gateway interfaces so the local nftables HTTP redirect can reach it; the generated input policy blocks the raw FastAPI port from the upstream interface, while Caddy proxies to `127.0.0.1`. The eventual service command should include the following Uvicorn arguments (use the configured portal port if it differs from 8000):
+
+~~~bash
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+~~~
+
+Trust forwarded headers only from loopback so the API can identify hotspot client addresses without trusting arbitrary external headers. Set `COOKIE_SECURE=true` when using HTTPS; the renderer refuses to generate public-portal configuration if this is disabled.
 
 **Important limitations:** the current gateway policy is IPv4-only; IPv6 captive enforcement and DHCPv6/RA option delivery remain pending. HTTP interception is limited to unauthenticated client TCP port 80. HTTPS is never intercepted. Caddy's public certificate issuance requires a reachable public DNS name and an ACME challenge path. The gateway operator must arrange router port forwarding or another supported ACME method; iMao does not supply a domain or certificate.
 
