@@ -126,7 +126,7 @@ Do this only after the dedicated iMao nftables tables have been installed and re
 - Each active client receives directional nftables counters for upload and download traffic.
 - The accounting worker polls those counters, persists deltas in SQLite, and increments the voucher's cumulative `used_bytes`.
 - Counter resets are handled as a new counter epoch; stored session totals are not reset.
-- Logout, session expiry and quota exhaustion remove the client's authorization and its temporary counter rules.
+- Logout, session expiry and quota exhaustion queue removal of the client's authorization and temporary counter rules. Failed revocations remain pending and are retried by the background worker; a new session for the same client IP is blocked until cleanup succeeds.
 - The default voucher quota remains 500 MiB; session authorization expires after 12 hours by default.
 - Accounting is serialized through SQLite write transactions so multiple API workers do not apply the same counter delta twice.
 
