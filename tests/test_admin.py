@@ -59,3 +59,75 @@ def test_database_migrates_existing_vouchers_table(tmp_path):
         columns = {row["name"] for row in db.execute("PRAGMA table_info(vouchers)")}
         assert {"revoked_at", "batch_id"}.issubset(columns)
         assert db.execute("SELECT code_hash FROM vouchers").fetchone()["code_hash"] == "existing-hash"
+
+
+def test_role_permissions_restrict_viewer_from_voucher_creation(tmp_path, monkeypatch):
+    from starlette.requests import Request
+
+    settings = _test_settings(tmp_path / "roles.sqlite3")
+    monkeypatch.setattr(database, "get_settings", lambda: settings)
+    database.initialize_database()
+    admin.create_admin("readonly", "a-strong-password-123", "viewer")
+    token = "test-admin-session-token"
+    with database.connect() as db:
+        admin_id = db.execute("SELECT id FROM admin_users WHERE username='readonly'").fetchone()["id"]
+        db.execute(
+            "INSERT INTO admin_sessions (admin_user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+            (admin_id, admin._token_hash(token), (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()),
+        )
+    request = Request({
+        "type": "http", "method": "GET", "path": "/", "root_path": "",
+        "scheme": "http", "query_string": b"", "headers": [(b"cookie", f"imao_admin={token}".encode())],
+        "server": ("testserver", 80), "client": ("127.0.0.1", 12345), "http_version": "1.1",
+    })
+    assert admin.require_permission(request, "reports:read")["role"] == "viewer"
+    with pytest.raises(HTTPException) as error:
+        admin.require_permission(request, "voucher:create")
+    assert error.value.status_code == 403
+
+
+def test_last_active_admin_cannot_be_demoted_or_disabled(tmp_path, monkeypatch):
+    settings = _test_settings(tmp_path / "last-admin.sqlite3")
+    monkeypatch.setattr(database, "get_settings", lambda: settings)
+    database.initialize_database()
+    admin.create_admin("primary", "a-strong-password-123")
+    with database.connect() as db:
+        admin_id = db.execute("SELECT id FROM admin_users WHERE username='primary'").fetchone()["id"]
+    with pytest.raises(HTTPException) as error:
+        admin.update_admin_access(999, admin_id, "viewer", True)
+    assert error.value.status_code == 409
+    with pytest.raises(HTTPException) as error:
+        admin.update_admin_access(999, admin_id, "admin", False)
+    assert error.value.status_code == 409
+
+
+def test_usage_report_filters_sessions_and_redemptions_by_date(tmp_path, monkeypatch):
+    settings = _test_settings(tmp_path / "reports.sqlite3")
+    monkeypatch.setattr(database, "get_settings", lambda: settings)
+    database.initialize_database()
+    with database.connect() as db:
+        db.execute(
+            "INSERT INTO sessions (id, client_mac, client_ip, started_at, bytes_up, bytes_down) "
+            "VALUES ('s1', 'aa:bb:cc:dd:ee:ff', '10.42.0.2', '2026-11-18 10:00:00', 1024, 2048)"
+        )
+        db.execute(
+            "INSERT INTO sessions (id, client_mac, client_ip, started_at, bytes_up, bytes_down) "
+            "VALUES ('s2', 'aa:bb:cc:dd:ee:11', '10.42.0.3', '2026-11-19 10:00:00', 4096, 8192)"
+        )
+        db.execute(
+            "INSERT INTO vouchers (code_hash, quota_bytes, used_bytes, redeemed_at) "
+            "VALUES ('report-voucher', 5000, 3000, '2026-11-18T10:00:00+00:00')"
+        )
+    report = admin.usage_report("2026-11-18", "2026-11-18")
+    assert report["sessions"]["total"] == 1
+    assert report["sessions"]["upload_bytes"] == 1024
+    assert report["vouchers"]["redeemed"] == 1
+    assert report["revenue"]["available"] is False
+
+
+def test_admin_role_validation(tmp_path, monkeypatch):
+    settings = _test_settings(tmp_path / "invalid-role.sqlite3")
+    monkeypatch.setattr(database, "get_settings", lambda: settings)
+    database.initialize_database()
+    with pytest.raises(ValueError):
+        admin.create_admin("badrole", "a-strong-password-123", "superuser")
