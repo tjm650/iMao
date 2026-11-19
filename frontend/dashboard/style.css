@@ -1,0 +1,17 @@
+ :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#0b1220; color:#f4f7fb; }
+* { box-sizing:border-box; }
+body { margin:0; min-height:100vh; background:radial-gradient(circle at 50% 0%,#1c3552,#0b1220 58%); }
+.shell { min-height:100vh; display:grid; place-items:center; padding:24px; }
+.panel { width:min(100%,420px); padding:34px 28px; border:1px solid #26364c; border-radius:22px; background:#111c2c; box-shadow:0 24px 80px #0006; }
+.brand-mark { display:grid; place-items:center; width:48px; height:48px; border-radius:15px; background:linear-gradient(135deg,#22d3ee,#3b82f6); color:#071321; font-size:30px; font-weight:800; }
+.eyebrow { margin:25px 0 8px; color:#67e8f9; font-size:11px; font-weight:800; letter-spacing:.18em; }
+h1 { margin:0; font-size:clamp(27px,7vw,34px); letter-spacing:-.04em; }
+.muted { color:#9aabc0; line-height:1.6; }
+.usage { display:grid; gap:12px; margin:28px 0 14px; }
+.usage div { display:flex; justify-content:space-between; gap:12px; color:#9aabc0; font-size:13px; }
+.usage strong { color:#f4f7fb; }
+.track { height:9px; overflow:hidden; border-radius:99px; background:#26364c; }
+.track div { width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,#22d3ee,#60a5fa); transition:width .3s ease; }
+.message { min-height:20px; margin:16px 0; color:#fca5a5; font-size:13px; }
+button { width:100%; min-height:49px; border:0; border-radius:11px; background:linear-gradient(100deg,#22d3ee,#60a5fa); color:#071321; font:inherit; font-weight:800; cursor:pointer; }
+button:disabled { opacity:.6; }
