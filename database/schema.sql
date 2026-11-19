@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     bytes_down INTEGER NOT NULL DEFAULT 0,
     last_counter_up INTEGER,
     last_counter_down INTEGER,
+    revocation_pending INTEGER NOT NULL DEFAULT 0 CHECK (revocation_pending IN (0, 1)),
     status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'active', 'logged_out', 'limit_reached', 'stale', 'kicked', 'expired'))
 );
