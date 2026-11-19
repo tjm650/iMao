@@ -71,10 +71,15 @@ def redeem_voucher(code: str, client_ip: str, client_mac: str) -> tuple[str, str
             "SELECT COUNT(*) AS count FROM sessions WHERE client_mac = ? AND status = 'active'",
             (client_mac,),
         ).fetchone()["count"]
-        if active:
+        pending_revoke = db.execute(
+            "SELECT COUNT(*) AS count FROM sessions WHERE client_ip = ? AND revocation_pending = 1",
+            (client_ip,),
+        ).fetchone()["count"]
+        if active or pending_revoke:
             db.rollback()
             _record_attempt(client_ip, False)
-            raise HTTPException(status_code=409, detail="This device already has an active session")
+            detail = "This device already has an active session" if active else "Previous network cleanup is still pending. Please retry shortly."
+            raise HTTPException(status_code=409, detail=detail)
 
         session_id = secrets.token_urlsafe(18)
         session_token = secrets.token_urlsafe(32)
