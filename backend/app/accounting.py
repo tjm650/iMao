@@ -9,13 +9,43 @@ from database.database import connect
 logger = logging.getLogger(__name__)
 
 
+def counter_delta(previous: int | None, current: int) -> int:
+    """Return a non-negative delta, treating a lower counter as a reset epoch."""
+    if current < 0 or (previous is not None and previous < 0):
+        raise ValueError("Counter values cannot be negative")
+    return current if previous is None or current < previous else current - previous
+
+
+def expire_sessions() -> int:
+    now = datetime.now(timezone.utc).isoformat()
+    with connect() as db:
+        rows = db.execute(
+            "SELECT id, client_ip FROM sessions WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?",
+            (now,),
+        ).fetchall()
+        db.execute(
+            "UPDATE sessions SET status='expired', ended_at=? WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?",
+            (now, now),
+        )
+    settings = get_settings()
+    if settings.firewall_enabled and settings.firewall_backend == "nftables":
+        for row in rows:
+            try:
+                revoke_client(row["client_ip"])
+            except NetctlError:
+                logger.exception("Could not revoke expired session %s", row["id"])
+    return len(rows)
+
+
 def account_active_sessions() -> int:
     settings = get_settings()
+    if not settings.firewall_enabled or settings.firewall_backend != "nftables":
+        return 0
+
     with connect() as db:
         sessions = db.execute(
-            """SELECT s.id, s.client_ip, s.bytes_up, s.bytes_down,
-                      s.last_counter_up, s.last_counter_down,
-                      v.id AS voucher_id, v.quota_bytes, v.used_bytes
+            """SELECT s.id, s.client_ip, s.last_counter_up, s.last_counter_down,
+                      v.id AS voucher_id
                FROM sessions s JOIN vouchers v ON v.id = s.voucher_id
                WHERE s.status = 'active'"""
         ).fetchall()
@@ -28,11 +58,8 @@ def account_active_sessions() -> int:
             logger.exception("Could not read counters for session %s", session["id"])
             continue
 
-        previous_up = session["last_counter_up"]
-        previous_down = session["last_counter_down"]
-        # A counter reset is treated as a new counter epoch; prior totals remain in SQLite.
-        delta_up = current_up if previous_up is None or current_up < previous_up else current_up - previous_up
-        delta_down = current_down if previous_down is None or current_down < previous_down else current_down - previous_down
+        delta_up = counter_delta(session["last_counter_up"], current_up)
+        delta_down = counter_delta(session["last_counter_down"], current_down)
         delta = delta_up + delta_down
         exhausted = False
         with connect() as db:
