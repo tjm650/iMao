@@ -107,6 +107,8 @@ def render():
     dns_option = ""
     dns_override = ""
     if public_url:
+        if env.get("COOKIE_SECURE", "false").lower() not in ("1", "true", "yes", "on"):
+            raise SystemExit("Set COOKIE_SECURE=true when PORTAL_PUBLIC_URL is configured.")
         parsed = urlsplit(public_url)
         if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
                 or parsed.path not in ("", "/") or parsed.query or parsed.fragment
