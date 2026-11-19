@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('admin','manager','operator','viewer')),
     is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TEXT
