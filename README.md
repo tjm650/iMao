@@ -29,7 +29,8 @@ Still pending:
 - Hard byte-exact quota enforcement (polling-based enforcement can exceed the limit between polls and during in-flight packets)
 - Reliable hostapd/dnsmasq setup, static hotspot address management and service lifecycle/rollback
 - Target-host validation of the systemd template, monitoring probes and backup/restore process
-- Production security review, external monitoring, off-host encrypted backup scheduling and disaster-recovery exercise
+- Configure the real off-site storage remote, age recipient/recovery key and alert webhook; install/enable timers only after deployment approval
+- Production security review, independent external monitoring and a full disaster-recovery exercise
 - Payment ledger and transaction capture before trustworthy revenue reporting can be added
 
 ## Requirements
@@ -596,4 +597,4 @@ The repository now provides daily encrypted off-site backup and five-minute moni
 4. Privileged session authorization bridge, per-client traffic accounting and quota enforcement (implementation committed; target-host validation pending)
 5. Captive portal detection and client experience (HTTP interception, optional Caddy TLS template and DHCPv4 option 114 renderer implemented; deployment validation and IPv6 support pending)
 6. Admin dashboard, role-based access, voucher batches, exports and usage reports (implemented; target-host validation pending)
-7. Deployment readiness, monitoring probes, SQLite backup/restore tooling and hardened systemd template (implementation started; target-host validation pending)
+7. Deployment readiness, monitoring probes, encrypted off-site backup automation and systemd timer templates (repository implementation added; remote configuration, activation and target-host validation pending)
