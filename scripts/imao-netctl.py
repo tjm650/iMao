@@ -27,7 +27,7 @@ def chain_rules():
     return json.loads(result.stdout).get("nftables", [])
 
 
-def find_counter_handles(ip):
+def find_counter_rules(ip):
     found = {"up": None, "down": None}
     for item in chain_rules():
         rule = item.get("rule")
@@ -35,17 +35,16 @@ def find_counter_handles(ip):
             continue
         comment = rule.get("comment", "")
         if comment == f"imao-up:{ip}":
-            found["up"] = rule.get("handle")
+            found["up"] = rule
         elif comment == f"imao-down:{ip}":
-            found["down"] = rule.get("handle")
+            found["down"] = rule
     return found
 
 
 def remove_counters(ip):
-    handles = find_counter_handles(ip)
-    for handle in handles.values():
-        if handle is not None:
-            nft("delete", "rule", "inet", "imao", "forward", "handle", str(handle))
+    for rule in find_counter_rules(ip).values():
+        if rule and rule.get("handle") is not None:
+            nft("delete", "rule", "inet", "imao", "forward", "handle", str(rule["handle"]))
 
 
 def main():
@@ -58,14 +57,16 @@ def main():
         raise SystemExit("Client address is outside the configured hotspot subnet")
 
     if action == "authorize":
-        # Idempotently refresh the authorization lease and ensure directional byte counters exist.
-        nft("delete", "element", "inet", "imao", "authorized_v4", "{", str(address), "}")
+        try:
+            nft("delete", "element", "inet", "imao", "authorized_v4", "{", str(address), "}")
+        except subprocess.CalledProcessError:
+            pass
         nft("add", "element", "inet", "imao", "authorized_v4", "{", str(address), "timeout", "12h", "}")
-        handles = find_counter_handles(str(address))
-        if handles["up"] is None:
+        rules = find_counter_rules(str(address))
+        if rules["up"] is None:
             nft("insert", "rule", "inet", "imao", "forward", "iifname", iface, "ip", "saddr",
                 str(address), "counter", "comment", f"imao-up:{address}")
-        if handles["down"] is None:
+        if rules["down"] is None:
             nft("insert", "rule", "inet", "imao", "forward", "oifname", iface, "ip", "daddr",
                 str(address), "counter", "comment", f"imao-down:{address}")
         print("authorized")
@@ -77,20 +78,17 @@ def main():
         remove_counters(str(address))
         print("revoked")
     else:
-        handles = find_counter_handles(str(address))
+        rules = find_counter_rules(str(address))
         totals = {"bytes_up": 0, "bytes_down": 0}
-        for direction, handle in handles.items():
-            if handle is None:
+        for direction, rule in rules.items():
+            if not rule:
                 continue
-            for item in chain_rules():
-                rule = item.get("rule", {})
-                if rule.get("handle") == handle:
-                    for expression in rule.get("expr", []):
-                        counter = expression.get("counter", {}) if isinstance(expression, dict) else {}
-                        if direction == "up":
-                            totals["bytes_up"] = int(counter.get("bytes", 0))
-                        else:
-                            totals["bytes_down"] = int(counter.get("bytes", 0))
+            for expression in rule.get("expr", []):
+                counter = expression.get("counter", {}) if isinstance(expression, dict) else {}
+                if direction == "up":
+                    totals["bytes_up"] = int(counter.get("bytes", 0))
+                else:
+                    totals["bytes_down"] = int(counter.get("bytes", 0))
         print(json.dumps(totals))
 
 
