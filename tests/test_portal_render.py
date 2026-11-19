@@ -51,3 +51,15 @@ def test_renderer_rejects_invalid_portal_origins(tmp_path, monkeypatch, url):
     monkeypatch.setattr(network, "load_env", lambda: _environment(url))
     with pytest.raises(SystemExit):
         network.render()
+
+
+def test_renderer_rejects_reserved_portal_listener_ports(tmp_path, monkeypatch):
+    (tmp_path / "config").mkdir()
+    for name in ("hostapd.conf.example", "dnsmasq.conf.example", "nftables.conf.example"):
+        (tmp_path / "config" / name).write_text("{{PORTAL_PORT}}")
+    env = _environment("")
+    env["PORTAL_PORT"] = "80"
+    monkeypatch.setattr(network, "ROOT", tmp_path)
+    monkeypatch.setattr(network, "load_env", lambda: env)
+    with pytest.raises(SystemExit):
+        network.render()
