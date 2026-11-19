@@ -131,3 +131,52 @@ def test_admin_role_validation(tmp_path, monkeypatch):
     database.initialize_database()
     with pytest.raises(ValueError):
         admin.create_admin("badrole", "a-strong-password-123", "superuser")
+
+
+def test_inactive_admin_cannot_reuse_existing_session(tmp_path, monkeypatch):
+    from starlette.requests import Request
+
+    settings = _test_settings(tmp_path / "disabled-admin.sqlite3")
+    monkeypatch.setattr(database, "get_settings", lambda: settings)
+    database.initialize_database()
+    admin.create_admin("disabled", "a-strong-password-123")
+    token = "disabled-admin-token"
+    with database.connect() as db:
+        admin_id = db.execute("SELECT id FROM admin_users WHERE username='disabled'").fetchone()["id"]
+        db.execute(
+            "INSERT INTO admin_sessions (admin_user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+            (admin_id, admin._token_hash(token), (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()),
+        )
+        db.execute("UPDATE admin_users SET is_active=0 WHERE id=?", (admin_id,))
+    request = Request({
+        "type": "http", "method": "GET", "path": "/", "root_path": "",
+        "scheme": "http", "query_string": b"", "headers": [(b"cookie", f"imao_admin={token}".encode())],
+        "server": ("testserver", 80), "client": ("127.0.0.1", 12345), "http_version": "1.1",
+    })
+    with pytest.raises(HTTPException) as error:
+        admin.require_admin(request)
+    assert error.value.status_code == 401
+
+
+def test_admin_login_rate_limit_is_enforced_before_password_check(tmp_path, monkeypatch):
+    from fastapi import Response
+    from starlette.requests import Request
+
+    settings = _test_settings(tmp_path / "login-limit.sqlite3")
+    monkeypatch.setattr(database, "get_settings", lambda: settings)
+    database.initialize_database()
+    now = datetime.now(timezone.utc).isoformat()
+    with database.connect() as db:
+        for _ in range(5):
+            db.execute(
+                "INSERT INTO admin_login_attempts (client_ip, succeeded, attempted_at) VALUES (?, 0, ?)",
+                ("127.0.0.1", now),
+            )
+    request = Request({
+        "type": "http", "method": "POST", "path": "/api/admin/login", "root_path": "",
+        "scheme": "http", "query_string": b"", "headers": [],
+        "server": ("testserver", 80), "client": ("127.0.0.1", 12345), "http_version": "1.1",
+    })
+    with pytest.raises(HTTPException) as error:
+        admin.login_admin("missing", "incorrect-password", request, Response())
+    assert error.value.status_code == 429
