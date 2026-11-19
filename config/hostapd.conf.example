@@ -1,4 +1,4 @@
-# Rendered by scripts/imao-network.py; do not edit generated values by hand.
+# Rendered by scripts/wimao-network.py; do not edit generated values by hand.
 interface={{HOTSPOT_INTERFACE}}
 driver=nl80211
 ssid={{HOTSPOT_SSID}}
