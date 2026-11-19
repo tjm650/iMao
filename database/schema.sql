@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS vouchers (
 
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
+    session_token_hash TEXT,
     user_id INTEGER REFERENCES users(id),
     voucher_id INTEGER REFERENCES vouchers(id),
     client_mac TEXT NOT NULL,
@@ -37,6 +38,15 @@ CREATE TABLE IF NOT EXISTS sessions (
         CHECK (status IN ('pending', 'active', 'logged_out', 'limit_reached', 'stale', 'kicked'))
 );
 
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_ip TEXT NOT NULL,
+    succeeded INTEGER NOT NULL DEFAULT 0,
+    attempted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_client ON sessions(client_mac, client_ip);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token_hash);
 CREATE INDEX IF NOT EXISTS idx_vouchers_redeemed ON vouchers(redeemed_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time ON login_attempts(client_ip, attempted_at);
