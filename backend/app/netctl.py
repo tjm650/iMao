@@ -1,4 +1,4 @@
-"""Narrow, non-root interface to the installed iMao privileged helper."""
+"""Narrow, non-root interface to the installed wiMao privileged helper."""
 import ipaddress
 import json
 import subprocess
@@ -19,9 +19,9 @@ def _run(*args: str) -> str:
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        raise NetctlError("The iMao privileged network helper is unavailable.") from exc
+        raise NetctlError("The wiMao privileged network helper is unavailable.") from exc
     if result.returncode:
-        raise NetctlError(result.stderr.strip() or "The iMao network helper failed.")
+        raise NetctlError(result.stderr.strip() or "The wiMao network helper failed.")
     return result.stdout.strip()
 
 
