@@ -1,0 +1,13 @@
+# Rendered by scripts/imao-network.py.
+interface={{HOTSPOT_INTERFACE}}
+bind-dynamic
+dhcp-authoritative
+dhcp-range={{HOTSPOT_DHCP_START}},{{HOTSPOT_DHCP_END}},12h
+dhcp-option=option:router,{{HOTSPOT_GATEWAY}}
+dhcp-option=option:dns-server,{{HOTSPOT_GATEWAY}}
+domain-needed
+bogus-priv
+no-resolv
+server=1.1.1.1
+server=9.9.9.9
+# Do not use this file until the hotspot interface has its static gateway address.
