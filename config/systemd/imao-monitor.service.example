@@ -1,16 +1,16 @@
 [Unit]
-Description=iMao liveness and readiness monitoring check
-Documentation=https://github.com/tjm650/iMao
+Description=wiMao liveness and readiness monitoring check
+Documentation=https://github.com/tjm650/wiMao
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=imao
-Group=imao
-WorkingDirectory=/opt/imao
-EnvironmentFile=/etc/imao/monitor.env
-ExecStart=/opt/imao/.venv/bin/python /opt/imao/scripts/imao-monitor.py
+User=wimao
+Group=wimao
+WorkingDirectory=/opt/wimao
+EnvironmentFile=/etc/wimao/monitor.env
+ExecStart=/opt/wimao/.venv/bin/python /opt/wimao/scripts/wimao-monitor.py
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
