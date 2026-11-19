@@ -113,8 +113,11 @@ def firefox_probe(request: Request):
 @app.get("/api/captive-portal", include_in_schema=False)
 def captive_portal_api(request: Request):
     client_ip = request.client.host if request.client else ""
+    payload = {"captive": not client_is_authorized(client_ip)}
+    if settings.portal_public_url:
+        payload["user-portal-url"] = settings.portal_public_url.rstrip("/") + "/"
     return JSONResponse(
-        {"captive": not client_is_authorized(client_ip)},
+        payload,
         media_type="application/captive+json",
         headers={"Cache-Control": "no-store, private", "Vary": "Accept"},
     )
@@ -159,3 +162,12 @@ def session_status(request: Request):
 @app.post("/api/logout")
 def logout(request: Request, response: Response):
     return logout_session(request, response)
+
+
+@app.api_route("/{path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], include_in_schema=False)
+def captive_fallback(request: Request, path: str):
+    """Redirect arbitrary intercepted HTTP requests to the voucher portal."""
+    client_ip = request.client.host if request.client else ""
+    if not client_is_authorized(client_ip):
+        return RedirectResponse(url="/", status_code=303, headers={"Cache-Control": "no-store"})
+    return JSONResponse({"detail": "Not found"}, status_code=404)
