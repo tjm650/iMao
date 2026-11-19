@@ -22,3 +22,6 @@ def initialize_database(database_path: str | Path | None = None) -> None:
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
         if "session_token_hash" not in columns:
             connection.execute("ALTER TABLE sessions ADD COLUMN session_token_hash TEXT")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token_hash)"
+        )
