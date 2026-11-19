@@ -13,12 +13,13 @@
       <div class="brand-mark">i</div>
       <p class="eyebrow">WI-FI ACCESS</p>
       <h1>Welcome to iMao</h1>
-      <p class="muted">Enter your access voucher to connect to the internet.</p>
+      <p class="muted">Enter your access voucher to get online. Your connection activates as soon as your voucher is verified.</p>
 
       <form id="voucher-form">
         <label for="voucher">Voucher code</label>
-        <input id="voucher" name="voucher" autocomplete="one-time-code"
-               placeholder="Enter your voucher" required>
+        <input id="voucher" name="voucher" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false"
+               inputmode="text" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" aria-describedby="voucher-help" required>
+        <p id="voucher-help" class="field-help">Enter the 16-character code printed on your access voucher.</p>
         <button type="submit">Connect to internet</button>
         <p id="message" class="message" role="status" aria-live="polite"></p>
       </form>
