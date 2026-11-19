@@ -26,7 +26,7 @@ def expire_sessions() -> int:
             (now,),
         ).fetchall()
         db.execute(
-            """UPDATE sessions SET status='expired', ended_at=?, revocation_pending=?
+            """UPDATE sessions SET status='stale', ended_at=?, revocation_pending=?
                WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= ?""",
             (now, int(should_revoke), now),
         )
