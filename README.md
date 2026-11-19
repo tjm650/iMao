@@ -1,12 +1,12 @@
-# iMao
+# wiMao
 
-A lightweight, self-hosted Wi-Fi captive portal and voucher-based bandwidth manager. iMao is being developed as a platform that an operator can prepare on a Linux computer and connect to their own Ethernet/Wi-Fi hardware when ready to deploy.
+A lightweight, self-hosted Wi-Fi captive portal and voucher-based bandwidth manager. wiMao is being developed as a platform that an operator can prepare on a Linux computer and connect to their own Ethernet/Wi-Fi hardware when ready to deploy.
 
 ## Development approach
 
-**The current priority is to build and test the iMao application itself.** Do not configure the user's Wi-Fi adapter, change routes, start hotspot services, or activate firewall rules as part of ordinary application development.
+**The current priority is to build and test the wiMao application itself.** Do not configure the user's Wi-Fi adapter, change routes, start hotspot services, or activate firewall rules as part of ordinary application development.
 
-The eventual iMao operator will run the Linux host commands in this README on the computer that will act as the gateway. Those commands are not run by GitHub and are not automatically executed by the application. Hardware-specific values must be discovered and supplied on that computer at deployment time.
+The eventual wiMao operator will run the Linux host commands in this README on the computer that will act as the gateway. Those commands are not run by GitHub and are not automatically executed by the application. Hardware-specific values must be discovered and supplied on that computer at deployment time.
 
 ## Current implementation status
 
@@ -84,19 +84,19 @@ iw --version
 nft --version
 ~~~
 
-## B. Download the iMao source code
+## B. Download the wiMao source code
 
 Clone the repository and enter its directory:
 
 ~~~bash
-git clone https://github.com/tjm650/iMao.git
-cd iMao
+git clone https://github.com/tjm650/wiMao.git
+cd wiMao
 ~~~
 
 If the repository is already cloned, update it instead:
 
 ~~~bash
-cd iMao
+cd wiMao
 git pull origin main
 ~~~
 
@@ -114,7 +114,7 @@ pip install -r backend/requirements.txt
 Whenever the terminal is reopened, activate the environment again:
 
 ~~~bash
-cd iMao
+cd wiMao
 source .venv/bin/activate
 ~~~
 
@@ -201,7 +201,7 @@ An administrator can change another administrator's role or disable their accoun
 
 Voucher batch codes are returned once and are not stored in plaintext. Immediately after creating a batch, download its CSV or print the voucher sheet; keep these files private. The separate voucher-record CSV export contains metadata only and never contains voucher codes or password hashes.
 
-The usage report supports date filters and summarizes sessions, upload/download traffic, redeemed vouchers, issued quota and recorded voucher usage. **Revenue is deliberately not calculated:** iMao does not yet record payments or transaction amounts. A future payment ledger is required before actual revenue reporting can be trusted.
+The usage report supports date filters and summarizes sessions, upload/download traffic, redeemed vouchers, issued quota and recorded voucher usage. **Revenue is deliberately not calculated:** wiMao does not yet record payments or transaction amounts. A future payment ledger is required before actual revenue reporting can be trusted.
 
 ## G. Create test vouchers
 
@@ -228,10 +228,10 @@ ip -br address
 ip route
 iw dev
 iw list
-python scripts/imao-network.py discover
+python scripts/wimao-network.py discover
 ~~~
 
-The iMao discovery command reports the default route, network interfaces and whether AP mode appears to be supported. It is read-only: it does not change interface addresses, routes, services or firewall rules.
+The wiMao discovery command reports the default route, network interfaces and whether AP mode appears to be supported. It is read-only: it does not change interface addresses, routes, services or firewall rules.
 
 Identify:
 - The Ethernet interface carrying the default route (upstream)
@@ -258,7 +258,7 @@ Set the actual values for:
 Render the local configuration files:
 
 ~~~bash
-python scripts/imao-network.py render
+python scripts/wimao-network.py render
 ~~~
 
 This creates files under runtime-config/. The hostapd file contains the Wi-Fi passphrase; keep it private. Rendering does not assign the gateway address, start hostapd/dnsmasq or apply firewall rules.
@@ -281,7 +281,7 @@ Do not share the hostapd output publicly because it contains the Wi-Fi password.
 After rendering, run:
 
 ~~~bash
-sudo scripts/imao-firewall.sh check
+sudo scripts/wimao-firewall.sh check
 ~~~
 
 This runs nftables syntax validation only. It does not load rules. Keep these settings in the local .env during development and until a reviewed deployment:
@@ -297,20 +297,20 @@ These commands are documented for the future gateway operator. They require conf
 
 ### Install the restricted privileged helper
 
-First identify the unprivileged Linux account that will run the iMao API. Then, from the repository root:
+First identify the unprivileged Linux account that will run the wiMao API. Then, from the repository root:
 
 ~~~bash
 sudo bash scripts/install-privileged-helper.sh LINUX_SERVICE_USERNAME
 ~~~
 
-Replace LINUX_SERVICE_USERNAME with the actual account name. The installer creates a root-owned helper and a narrowly scoped sudoers entry; it does not install or activate the iMao firewall.
+Replace LINUX_SERVICE_USERNAME with the actual account name. The installer creates a root-owned helper and a narrowly scoped sudoers entry; it does not install or activate the wiMao firewall.
 
 Edit the root-owned helper configuration:
 
 ~~~bash
-sudo nano /etc/imao/netctl.json
-sudo chown root:root /etc/imao/netctl.json
-sudo chmod 600 /etc/imao/netctl.json
+sudo nano /etc/wimao/netctl.json
+sudo chown root:root /etc/wimao/netctl.json
+sudo chmod 600 /etc/wimao/netctl.json
 sudo visudo -c
 ~~~
 
@@ -331,7 +331,7 @@ sudo apt update
 sudo apt install caddy
 ~~~
 
-After the iMao renderer has produced `runtime-config/Caddyfile`, install that configuration and validate it:
+After the wiMao renderer has produced `runtime-config/Caddyfile`, install that configuration and validate it:
 
 ~~~bash
 sudo cp runtime-config/Caddyfile /etc/caddy/Caddyfile
@@ -350,23 +350,23 @@ Caddy can only obtain a publicly trusted certificate when its ACME challenge can
 
 ### Firewall activation is a separate, high-impact step
 
-**Do not run this until the generated rules, interface names, address plan and rollback procedure have been reviewed.** The firewall script changes only the dedicated iMao tables, but a wrong interface or subnet can still interrupt hotspot connectivity.
+**Do not run this until the generated rules, interface names, address plan and rollback procedure have been reviewed.** The firewall script changes only the dedicated wiMao tables, but a wrong interface or subnet can still interrupt hotspot connectivity.
 
 Only when a gateway deployment has been explicitly approved:
 1. Back up the existing firewall configuration using the distribution's normal firewall-management procedure.
 2. Confirm the Ethernet default route and hotspot interface one more time.
 3. Set FIREWALL_BACKEND=nftables and FIREWALL_ENABLED=true in the local .env.
-4. Apply the dedicated iMao rules:
+4. Apply the dedicated wiMao rules:
 
 ~~~bash
-sudo scripts/imao-firewall.sh install --confirm
-sudo scripts/imao-firewall.sh status
+sudo scripts/wimao-firewall.sh install --confirm
+sudo scripts/wimao-firewall.sh status
 ~~~
 
-The removal command removes only iMao's dedicated tables. It is a recovery operation and should only be used after understanding the effect on connected hotspot clients:
+The removal command removes only wiMao's dedicated tables. It is a recovery operation and should only be used after understanding the effect on connected hotspot clients:
 
 ~~~bash
-sudo scripts/imao-firewall.sh remove --confirm
+sudo scripts/wimao-firewall.sh remove --confirm
 ~~~
 
 Do not use nft flush ruleset; it would remove rules belonging to other host services and could disrupt connectivity.
@@ -388,7 +388,7 @@ The templates currently provide:
 
 When explicitly enabled on a prepared gateway:
 - Successful voucher redemption calls the restricted helper to authorize the client's IPv4 address.
-- Upload and download counters are read from the dedicated iMao nftables forwarding chain.
+- Upload and download counters are read from the dedicated wiMao nftables forwarding chain.
 - Usage deltas are persisted in SQLite and accumulated against the voucher's quota.
 - Logout, session expiry and quota exhaustion queue network revocation; failed revocations are retried.
 - The helper accepts only configured-hotspot-subnet IPv4 addresses and does not invoke a shell with client-supplied arguments.
@@ -397,7 +397,7 @@ When explicitly enabled on a prepared gateway:
 
 ## Captive portal detection and HTTPS setup
 
-iMao now provides HTTP probe handlers for common operating-system checks. Unauthenticated clients receive an HTTP 302 redirect to the voucher portal; active clients receive the platform's expected online response. These handlers support probe-based detection and must be reached through the eventual gateway's HTTP interception/redirect rules. They do not intercept HTTPS.
+wiMao now provides HTTP probe handlers for common operating-system checks. Unauthenticated clients receive an HTTP 302 redirect to the voucher portal; active clients receive the platform's expected online response. These handlers support probe-based detection and must be reached through the eventual gateway's HTTP interception/redirect rules. They do not intercept HTTPS.
 
 - Android: `/generate_204` and `/gen_204` return HTTP 204 for authorized clients.
 - Apple iOS/macOS: `/hotspot-detect.html` returns a small HTML page containing `Success`.
@@ -420,7 +420,7 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwar
 
 Trust forwarded headers only from loopback so the API can identify hotspot client addresses without trusting arbitrary external headers. Set `COOKIE_SECURE=true` when using HTTPS; the renderer refuses to generate public-portal configuration if this is disabled.
 
-**Important limitations:** the current gateway policy is IPv4-only; IPv6 captive enforcement and DHCPv6/RA option delivery remain pending. HTTP interception is limited to unauthenticated client TCP port 80. HTTPS is never intercepted. Caddy's public certificate issuance requires a reachable public DNS name and an ACME challenge path. The gateway operator must arrange router port forwarding or another supported ACME method; iMao does not supply a domain or certificate.
+**Important limitations:** the current gateway policy is IPv4-only; IPv6 captive enforcement and DHCPv6/RA option delivery remain pending. HTTP interception is limited to unauthenticated client TCP port 80. HTTPS is never intercepted. Caddy's public certificate issuance requires a reachable public DNS name and an ACME challenge path. The gateway operator must arrange router port forwarding or another supported ACME method; wiMao does not supply a domain or certificate.
 
 
 - GET /api/captive-portal — RFC 8908 captive-state API
@@ -455,32 +455,32 @@ Use `/health` for process monitoring and `/ready` before sending user traffic. A
 
 ### SQLite backup and restore
 
-The `scripts/imao-db.py` utility uses SQLite's online backup API to create a consistent database snapshot, then runs `PRAGMA integrity_check`. Backup files are created with owner-only permissions (0600), and existing backup files are never overwritten.
+The `scripts/wimao-db.py` utility uses SQLite's online backup API to create a consistent database snapshot, then runs `PRAGMA integrity_check`. Backup files are created with owner-only permissions (0600), and existing backup files are never overwritten.
 
 Create and verify a backup:
 
 ~~~bash
-python scripts/imao-db.py backup --output /secure/backup/location/imao.sqlite3
-python scripts/imao-db.py verify /secure/backup/location/imao.sqlite3
+python scripts/wimao-db.py backup --output /secure/backup/location/wimao.sqlite3
+python scripts/wimao-db.py verify /secure/backup/location/wimao.sqlite3
 ~~~
 
 If `--output` is omitted, a UTC timestamped file is created under `./backups`. The database path defaults to `DATABASE_PATH` from `.env`; it can be overridden with `--database`.
 
-Restore is a maintenance operation. Stop the iMao service first, verify the selected backup, then explicitly confirm the restore:
+Restore is a maintenance operation. Stop the wiMao service first, verify the selected backup, then explicitly confirm the restore:
 
 ~~~bash
-sudo systemctl stop imao
-python scripts/imao-db.py verify /secure/backup/location/imao.sqlite3
-python scripts/imao-db.py --database /var/lib/imao/imao.sqlite3 restore /secure/backup/location/imao.sqlite3 --confirm
-sudo systemctl start imao
-sudo systemctl status imao --no-pager
+sudo systemctl stop wimao
+python scripts/wimao-db.py verify /secure/backup/location/wimao.sqlite3
+python scripts/wimao-db.py --database /var/lib/wimao/wimao.sqlite3 restore /secure/backup/location/wimao.sqlite3 --confirm
+sudo systemctl start wimao
+sudo systemctl status wimao --no-pager
 ~~~
 
-When the live database exists, the restore utility first creates and verifies a timestamped `.pre-restore-*` safety copy beside it. It then restores through a temporary file and atomic replacement. Do not restore while iMao is running or while another process is writing to the database. Store backups outside the web root, restrict access, encrypt off-host copies and periodically test restoration. A local backup alone does not protect against disk loss or theft.
+When the live database exists, the restore utility first creates and verifies a timestamped `.pre-restore-*` safety copy beside it. It then restores through a temporary file and atomic replacement. Do not restore while wiMao is running or while another process is writing to the database. Store backups outside the web root, restrict access, encrypt off-host copies and periodically test restoration. A local backup alone does not protect against disk loss or theft.
 
 ### Automated encrypted off-site backups
 
-The repository includes `scripts/imao-offsite-backup.py` and a daily systemd service/timer template. Each run:
+The repository includes `scripts/wimao-offsite-backup.py` and a daily systemd service/timer template. Each run:
 1. Uses the SQLite online-backup utility to create a consistent snapshot.
 2. Encrypts the snapshot with `age` using a public recipient key.
 3. Uploads only the encrypted artifact through a configured `rclone` remote.
@@ -489,44 +489,44 @@ The repository includes `scripts/imao-offsite-backup.py` and a daily systemd ser
 
 The gateway needs the `age` and `rclone` executables, a configured rclone remote, and the age *public recipient*. The age private identity is for recovery and should be stored offline or in a separate secure recovery location, never on the gateway. Prefer a dedicated rclone remote with server-side access restricted to the backup path. The remote should not be mounted as a public web directory.
 
-Create a protected backup environment file at `/etc/imao/backup.env`:
+Create a protected backup environment file at `/etc/wimao/backup.env`:
 
 ~~~dotenv
 BACKUP_AGE_RECIPIENT=age1REPLACE_WITH_YOUR_PUBLIC_RECIPIENT
-BACKUP_RCLONE_DESTINATION=backupremote:imao
+BACKUP_RCLONE_DESTINATION=backupremote:wimao
 ~~~
 
-Configure the rclone remote in `/etc/imao/rclone.conf`; it may contain provider credentials and must be protected. The service template points rclone to that exact file. Set ownership and permissions so only root and the iMao service account can read the configuration, for example:
+Configure the rclone remote in `/etc/wimao/rclone.conf`; it may contain provider credentials and must be protected. The service template points rclone to that exact file. Set ownership and permissions so only root and the wiMao service account can read the configuration, for example:
 
 ~~~bash
-sudo chown root:imao /etc/imao/backup.env /etc/imao/rclone.conf
-sudo chmod 0640 /etc/imao/backup.env /etc/imao/rclone.conf
+sudo chown root:wimao /etc/wimao/backup.env /etc/wimao/rclone.conf
+sudo chmod 0640 /etc/wimao/backup.env /etc/wimao/rclone.conf
 ~~~
 
-Install `age` and `rclone` from trusted distribution/vendor sources. The backup service also reads `/etc/imao/imao.env` for `DATABASE_PATH`. Do not put age private keys or plaintext provider passwords in the repository, application database, command history or logs.
+Install `age` and `rclone` from trusted distribution/vendor sources. The backup service also reads `/etc/wimao/wimao.env` for `DATABASE_PATH`. Do not put age private keys or plaintext provider passwords in the repository, application database, command history or logs.
 
 The timer template is daily with a randomized delay and persistent catch-up after downtime. For an explicitly approved Linux deployment, review and install the unit files:
 
 ~~~bash
-sudo install -o root -g root -m 0644 config/systemd/imao-offsite-backup.service.example /etc/systemd/system/imao-offsite-backup.service
-sudo install -o root -g root -m 0644 config/systemd/imao-offsite-backup.timer.example /etc/systemd/system/imao-offsite-backup.timer
-sudo systemd-analyze verify /etc/systemd/system/imao-offsite-backup.service /etc/systemd/system/imao-offsite-backup.timer
+sudo install -o root -g root -m 0644 config/systemd/wimao-offsite-backup.service.example /etc/systemd/system/wimao-offsite-backup.service
+sudo install -o root -g root -m 0644 config/systemd/wimao-offsite-backup.timer.example /etc/systemd/system/wimao-offsite-backup.timer
+sudo systemd-analyze verify /etc/systemd/system/wimao-offsite-backup.service /etc/systemd/system/wimao-offsite-backup.timer
 ~~~
 
-A manual backup run can then be tested with `sudo systemctl start imao-offsite-backup.service`, followed by `sudo systemctl status imao-offsite-backup.service` and `sudo journalctl -u imao-offsite-backup.service`. Only after verifying the remote artifact and recovery key should an operator enable the timer with `sudo systemctl enable --now imao-offsite-backup.timer`. These are future gateway-operator commands; no timer is installed or enabled by repository development.
+A manual backup run can then be tested with `sudo systemctl start wimao-offsite-backup.service`, followed by `sudo systemctl status wimao-offsite-backup.service` and `sudo journalctl -u wimao-offsite-backup.service`. Only after verifying the remote artifact and recovery key should an operator enable the timer with `sudo systemctl enable --now wimao-offsite-backup.timer`. These are future gateway-operator commands; no timer is installed or enabled by repository development.
 
 **Retention is intentionally not automated yet.** Configure retention/lifecycle rules on the remote storage after deciding the required recovery-point and retention policy. Keep multiple generations and test restore before deleting old backups.
 
 ### Monitoring and alert delivery
 
-The `scripts/imao-monitor.py` utility checks both `/health` and `/ready`, with bounded request timeouts. It exits non-zero on failure and sends a short generic alert only when `IMAO_ALERT_WEBHOOK` is configured. The webhook payload uses a Slack-compatible JSON `text` field; do not point it at an endpoint that cannot accept that format. Alert messages do not include voucher codes, database contents, client addresses or response bodies.
+The `scripts/wimao-monitor.py` utility checks both `/health` and `/ready`, with bounded request timeouts. It exits non-zero on failure and sends a short generic alert only when `WIMAO_ALERT_WEBHOOK` is configured. The webhook payload uses a Slack-compatible JSON `text` field; do not point it at an endpoint that cannot accept that format. Alert messages do not include voucher codes, database contents, client addresses or response bodies.
 
-Create a protected `/etc/imao/monitor.env` file:
+Create a protected `/etc/wimao/monitor.env` file:
 
 ~~~dotenv
-IMAO_MONITOR_BASE_URL=http://127.0.0.1:8000
-IMAO_MONITOR_TIMEOUT_SECONDS=5
-IMAO_ALERT_WEBHOOK=
+WIMAO_MONITOR_BASE_URL=http://127.0.0.1:8000
+WIMAO_MONITOR_TIMEOUT_SECONDS=5
+WIMAO_ALERT_WEBHOOK=
 ~~~
 
 Keep the webhook URL secret and set file permissions to root/service-account read only. If no webhook is configured, failed checks are still logged and the monitor exits non-zero, but no external notification is delivered.
@@ -534,45 +534,45 @@ Keep the webhook URL secret and set file permissions to root/service-account rea
 For an explicitly approved Linux deployment, install and validate the monitor service and timer templates:
 
 ~~~bash
-sudo install -o root -g root -m 0644 config/systemd/imao-monitor.service.example /etc/systemd/system/imao-monitor.service
-sudo install -o root -g root -m 0644 config/systemd/imao-monitor.timer.example /etc/systemd/system/imao-monitor.timer
-sudo systemd-analyze verify /etc/systemd/system/imao-monitor.service /etc/systemd/system/imao-monitor.timer
+sudo install -o root -g root -m 0644 config/systemd/wimao-monitor.service.example /etc/systemd/system/wimao-monitor.service
+sudo install -o root -g root -m 0644 config/systemd/wimao-monitor.timer.example /etc/systemd/system/wimao-monitor.timer
+sudo systemd-analyze verify /etc/systemd/system/wimao-monitor.service /etc/systemd/system/wimao-monitor.timer
 ~~~
 
-After reviewing the destination and test-alert policy, a one-time check can be run with `sudo systemctl start imao-monitor.service`. Inspect `sudo systemctl status imao-monitor.service` and `sudo journalctl -u imao-monitor.service`. Enable periodic checks only after approval with `sudo systemctl enable --now imao-monitor.timer`. The timer is configured to run every five minutes after boot. It does not configure a monitoring vendor or create an external webhook for you.
+After reviewing the destination and test-alert policy, a one-time check can be run with `sudo systemctl start wimao-monitor.service`. Inspect `sudo systemctl status wimao-monitor.service` and `sudo journalctl -u wimao-monitor.service`. Enable periodic checks only after approval with `sudo systemctl enable --now wimao-monitor.timer`. The timer is configured to run every five minutes after boot. It does not configure a monitoring vendor or create an external webhook for you.
 
 ### Restore drill and recovery validation
 
 A backup is not considered operational until it has been restored and checked. For a non-production drill, download a selected encrypted backup from the configured remote, decrypt it using the offline recovery identity, verify its integrity, then restore it to a separate temporary database path:
 
 ~~~bash
-age --decrypt --identity /secure/offline/imao-backup-identity.txt --output /tmp/imao-restore-drill.sqlite3 /secure/restore/imao-backup.sqlite3.age
-python scripts/imao-db.py verify /tmp/imao-restore-drill.sqlite3
-python scripts/imao-db.py --database /tmp/imao-restore-drill-target.sqlite3 restore /tmp/imao-restore-drill.sqlite3 --confirm
-python scripts/imao-db.py verify /tmp/imao-restore-drill-target.sqlite3
+age --decrypt --identity /secure/offline/wimao-backup-identity.txt --output /tmp/wimao-restore-drill.sqlite3 /secure/restore/wimao-backup.sqlite3.age
+python scripts/wimao-db.py verify /tmp/wimao-restore-drill.sqlite3
+python scripts/wimao-db.py --database /tmp/wimao-restore-drill-target.sqlite3 restore /tmp/wimao-restore-drill.sqlite3 --confirm
+python scripts/wimao-db.py verify /tmp/wimao-restore-drill-target.sqlite3
 ~~~
 
 Use a restricted maintenance environment and remove the temporary plaintext databases securely after the drill. Do not perform a drill against the production database path. Confirm that expected voucher, administrator and audit records are present using an approved, access-controlled inspection procedure. Session rows may have expired by the time a backup is restored and should not be treated as proof that network clients are still authorized. A restored database does not restore nftables state or recreate live network authorizations.
 
 ### systemd deployment template (future gateway operation)
 
-`config/systemd/imao.service.example` is a reviewable service template, not an installed service. It assumes:
-- Application code at `/opt/imao`
-- A dedicated unprivileged `imao` user and group
-- A protected environment file at `/etc/imao/imao.env`
-- SQLite state under `/var/lib/imao/`
-- A Python environment at `/opt/imao/.venv`
+`config/systemd/wimao.service.example` is a reviewable service template, not an installed service. It assumes:
+- Application code at `/opt/wimao`
+- A dedicated unprivileged `wimao` user and group
+- A protected environment file at `/etc/wimao/wimao.env`
+- SQLite state under `/var/lib/wimao/`
+- A Python environment at `/opt/wimao/.venv`
 
-Set `DATABASE_PATH=/var/lib/imao/imao.sqlite3` in the protected environment file and ensure the `imao` service account can access the configured state directory. The template binds Uvicorn to loopback by default so a local reverse proxy can be used. Do not expose the API listener directly to an untrusted network. Any change to the bind address for hotspot HTTP interception must be reviewed with the firewall and proxy design first.
+Set `DATABASE_PATH=/var/lib/wimao/wimao.sqlite3` in the protected environment file and ensure the `wimao` service account can access the configured state directory. The template binds Uvicorn to loopback by default so a local reverse proxy can be used. Do not expose the API listener directly to an untrusted network. Any change to the bind address for hotspot HTTP interception must be reviewed with the firewall and proxy design first.
 
 The template leaves `NoNewPrivileges=false` because the existing restricted network helper is invoked through a narrow sudoers rule. This is a deliberate privilege boundary that must be reviewed: keep the helper root-owned, keep sudoers limited to the exact helper executable, and do not grant a general shell or unrestricted sudo access to the service account.
 
 During an explicitly approved deployment, install a reviewed copy and validate the installed unit before enabling it:
 
 ~~~bash
-sudo install -o root -g root -m 0644 config/systemd/imao.service.example /etc/systemd/system/imao.service
-sudo systemd-analyze verify /etc/systemd/system/imao.service
-sudo systemd-analyze security imao.service
+sudo install -o root -g root -m 0644 config/systemd/wimao.service.example /etc/systemd/system/wimao.service
+sudo systemd-analyze verify /etc/systemd/system/wimao.service
+sudo systemd-analyze security wimao.service
 ~~~
 
 These commands install and inspect the unit file but do not enable or start it. Do not run them as part of ordinary application development. Service enablement and startup require separate deployment approval and a rollback plan.
@@ -602,15 +602,15 @@ The repository now provides daily encrypted off-site backup and five-minute moni
 
 ## Stage 7: operational recovery and deployment validation
 
-The gateway recovery and rollback procedure is maintained in [docs/OPERATIONS-RECOVERY.md](docs/OPERATIONS-RECOVERY.md). It covers diagnostic collection, safe service shutdown, removal of only iMao's dedicated nftables tables, host-network restoration boundaries, database recovery, and controlled service restart. It explicitly prohibits global firewall flushes.
+The gateway recovery and rollback procedure is maintained in [docs/OPERATIONS-RECOVERY.md](docs/OPERATIONS-RECOVERY.md). It covers diagnostic collection, safe service shutdown, removal of only wiMao's dedicated nftables tables, host-network restoration boundaries, database recovery, and controlled service restart. It explicitly prohibits global firewall flushes.
 
 Before installing any example systemd unit on the eventual Linux gateway, copy the reviewed files into a staging directory and run:
 
 ~~~bash
-sudo systemd-analyze verify /path/to/staged/imao.service /path/to/staged/imao-offsite-backup.service /path/to/staged/imao-offsite-backup.timer /path/to/staged/imao-monitor.service /path/to/staged/imao-monitor.timer
-sudo systemd-analyze security imao.service
-sudo systemd-analyze security imao-offsite-backup.service
-sudo systemd-analyze security imao-monitor.service
+sudo systemd-analyze verify /path/to/staged/wimao.service /path/to/staged/wimao-offsite-backup.service /path/to/staged/wimao-offsite-backup.timer /path/to/staged/wimao-monitor.service /path/to/staged/wimao-monitor.timer
+sudo systemd-analyze security wimao.service
+sudo systemd-analyze security wimao-offsite-backup.service
+sudo systemd-analyze security wimao-monitor.service
 ~~~
 
 Use the actual staged filenames (without the `.example` suffix). Some hardening settings intentionally differ between services; review each reported exposure in context. These commands validate unit parsing and provide a security review aid; they do not install, start, or enable services. CI checks the template structure and critical safety settings, but only the target gateway can provide authoritative validation against its installed systemd version, filesystem layout, service account, executable paths, and local policy.
