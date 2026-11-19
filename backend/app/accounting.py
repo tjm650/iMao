@@ -82,15 +82,10 @@ def account_active_sessions() -> int:
             db.execute("UPDATE vouchers SET used_bytes=? WHERE id=?", (new_used, session["voucher_id"]))
             if new_used >= current["quota_bytes"]:
                 db.execute(
-                    "UPDATE sessions SET status='limit_reached', ended_at=? WHERE id=? AND status='active'",
+                    "UPDATE sessions SET status='limit_reached', ended_at=?, revocation_pending=1 WHERE id=? AND status='active'",
                     (datetime.now(timezone.utc).isoformat(), session["id"]),
                 )
                 exhausted = True
             db.commit()
-        if exhausted:
-            try:
-                revoke_client(session["client_ip"])
-            except NetctlError:
-                logger.exception("Quota reached but network revocation failed for %s", session["client_ip"])
         processed += 1
     return processed
