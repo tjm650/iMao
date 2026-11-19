@@ -9,7 +9,7 @@ from backend.app.vouchers import create_voucher
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create a single-use iMao access voucher")
+    parser = argparse.ArgumentParser(description="Create a single-use wiMao access voucher")
     parser.add_argument("--quota-mb", type=int, default=None, help="Voucher allowance in MB (default: configured default)")
     parser.add_argument("--expires-at", default=None, help="Optional ISO-8601 expiry with timezone, e.g. 2027-01-01T00:00:00+00:00")
     args = parser.parse_args()
