@@ -1,18 +1,19 @@
 import asyncio
 import csv
 import io
+import hmac
 import logging
 from contextlib import suppress
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Header, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.app.accounting import account_active_sessions, expire_sessions, retry_pending_revocations
 from backend.app.admin import (
-    create_voucher_batch, dashboard_summary, list_admins, list_vouchers, login_admin,
+    bootstrap_admin, create_voucher_batch, dashboard_summary, list_admins, list_vouchers, login_admin,
     logout_admin, require_admin, require_permission, revoke_voucher,
     update_admin_access, usage_report,
 )
@@ -43,6 +44,11 @@ class VoucherLogin(BaseModel):
 class AdminLogin(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=1, max_length=256)
+
+
+class AdminBootstrap(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    password: str = Field(min_length=12, max_length=256)
 
 
 class VoucherBatchRequest(BaseModel):
@@ -193,6 +199,30 @@ def admin_page():
     if not page.exists():
         return JSONResponse({"detail": "Admin interface is not installed yet"}, status_code=503)
     return FileResponse(page)
+
+
+@app.post("/api/admin/bootstrap", include_in_schema=False)
+def admin_bootstrap(
+    payload: AdminBootstrap,
+    response: Response,
+    x_admin_bootstrap_secret: str | None = Header(default=None),
+):
+    configured_secret = settings.admin_bootstrap_secret
+    if len(configured_secret) < 32:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Administrator bootstrap is not configured")
+    supplied_secret = x_admin_bootstrap_secret or ""
+    if not hmac.compare_digest(supplied_secret, configured_secret):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Invalid bootstrap authorization")
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    try:
+        bootstrap_admin(payload.username, payload.password)
+    except ValueError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"status": "created", "username": payload.username.strip()}
 
 
 @app.post("/api/admin/login")
