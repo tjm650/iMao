@@ -54,7 +54,7 @@ def redeem_voucher(code: str, client_ip: str, client_mac: str) -> tuple[str, str
         db.execute("BEGIN IMMEDIATE")
         voucher = db.execute("SELECT * FROM vouchers WHERE code_hash = ?", (code_hash,)).fetchone()
 
-        valid = bool(voucher) and voucher["redeemed_at"] is None
+        valid = bool(voucher) and voucher["redeemed_at"] is None and voucher["revoked_at"] is None
         if valid and voucher["expires_at"]:
             try:
                 expiry = datetime.fromisoformat(voucher["expires_at"].replace("Z", "+00:00"))
@@ -65,7 +65,7 @@ def redeem_voucher(code: str, client_ip: str, client_mac: str) -> tuple[str, str
         if not valid:
             db.rollback()
             _record_attempt(client_ip, False)
-            raise HTTPException(status_code=401, detail="Voucher is invalid, expired or already used")
+            raise HTTPException(status_code=401, detail="Voucher is invalid, expired, revoked or already used")
 
         active = db.execute(
             "SELECT COUNT(*) AS count FROM sessions WHERE client_mac = ? AND status = 'active'",
@@ -85,7 +85,7 @@ def redeem_voucher(code: str, client_ip: str, client_mac: str) -> tuple[str, str
         session_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(session_token.encode()).hexdigest()
         db.execute(
-            "UPDATE vouchers SET redeemed_at = ?, redeemed_by_user_id = NULL WHERE id = ? AND redeemed_at IS NULL",
+            "UPDATE vouchers SET redeemed_at = ?, redeemed_by_user_id = NULL WHERE id = ? AND redeemed_at IS NULL AND revoked_at IS NULL",
             (now.isoformat(), voucher["id"]),
         )
         db.execute(
@@ -114,7 +114,6 @@ def authenticate_voucher(request: Request, response: Response, code: str) -> dic
         try:
             authorize_client(client_ip)
         except NetctlError as exc:
-            # Do not consume the voucher if network authorization did not succeed.
             with connect() as db:
                 db.execute("BEGIN IMMEDIATE")
                 db.execute("UPDATE sessions SET status='kicked', ended_at=?, revocation_pending=1 WHERE id=? AND status='active'",
@@ -130,11 +129,8 @@ def authenticate_voucher(request: Request, response: Response, code: str) -> dic
                 pass
             raise HTTPException(status_code=503, detail="Network access could not be enabled. Please try again.") from exc
 
-    response.set_cookie(
-        COOKIE_NAME, token,
-        httponly=True, secure=settings.cookie_secure,
-        samesite="strict", path="/", max_age=60 * 60 * settings.session_max_hours,
-    )
+    response.set_cookie(COOKIE_NAME, token, httponly=True, secure=settings.cookie_secure,
+                        samesite="strict", path="/", max_age=60 * 60 * settings.session_max_hours)
     return {"status": "connected", **quota}
 
 
@@ -166,33 +162,21 @@ def current_session(request: Request) -> dict:
             except NetctlError:
                 pass
         raise HTTPException(status_code=401, detail="Session has expired")
-    return {
-        "status": row["status"],
-        "started_at": row["started_at"],
-        "expires_at": row["expires_at"],
-        "quota_bytes": row["quota_bytes"],
-        "used_bytes": row["used_bytes"],
-        "bytes_up": row["bytes_up"],
-        "bytes_down": row["bytes_down"],
-        "remaining_bytes": max(row["quota_bytes"] - row["used_bytes"], 0),
-    }
+    return {"status": row["status"], "started_at": row["started_at"], "expires_at": row["expires_at"],
+            "quota_bytes": row["quota_bytes"], "used_bytes": row["used_bytes"], "bytes_up": row["bytes_up"],
+            "bytes_down": row["bytes_down"], "remaining_bytes": max(row["quota_bytes"] - row["used_bytes"], 0)}
 
 
 def logout_session(request: Request, response: Response) -> dict[str, str]:
-    # Capture the final counter interval before removing its nftables counter rules.
     from backend.app.accounting import account_active_sessions
     account_active_sessions()
     token = request.cookies.get(COOKIE_NAME)
     if token:
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         with connect() as db:
-            row = db.execute(
-                "SELECT client_ip FROM sessions WHERE session_token_hash=? AND status='active'", (token_hash,)
-            ).fetchone()
-            db.execute(
-                "UPDATE sessions SET status = 'logged_out', ended_at = ?, revocation_pending = ? WHERE session_token_hash = ? AND status = 'active'",
-                (_now().isoformat(), int(get_settings().firewall_enabled), token_hash),
-            )
+            row = db.execute("SELECT client_ip FROM sessions WHERE session_token_hash=? AND status='active'", (token_hash,)).fetchone()
+            db.execute("UPDATE sessions SET status='logged_out', ended_at=?, revocation_pending=? WHERE session_token_hash=? AND status='active'",
+                       (_now().isoformat(), int(get_settings().firewall_enabled), token_hash))
         settings = get_settings()
         if row and settings.firewall_enabled and settings.firewall_backend == "nftables":
             try:
