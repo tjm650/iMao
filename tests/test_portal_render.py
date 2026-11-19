@@ -14,7 +14,7 @@ def _environment(url):
         "UPSTREAM_INTERFACE": "eth0", "HOTSPOT_INTERFACE": "wlan0",
         "HOTSPOT_CIDR": "10.42.0.0/24", "HOTSPOT_GATEWAY": "10.42.0.1",
         "HOTSPOT_SSID": "iMao", "HOTSPOT_PASSPHRASE": "12345678",
-        "WIFI_COUNTRY_CODE": "ZW", "PORTAL_PORT": "8000",
+        "WIFI_COUNTRY_CODE": "ZW", "PORTAL_PORT": "8000", "COOKIE_SECURE": "true",
         "PORTAL_PUBLIC_URL": url,
     }
 
