@@ -41,6 +41,10 @@ def test_restore_requires_confirmation_and_restores_snapshot(tmp_path):
     imao_db.restore(snapshot, source, True)
     with sqlite3.connect(source) as db:
         assert db.execute("SELECT value FROM sample ORDER BY rowid DESC LIMIT 1").fetchone()[0] == "original"
+    safety_copies = list(tmp_path.glob("live.sqlite3.pre-restore-*"))
+    assert len(safety_copies) == 1
+    with sqlite3.connect(safety_copies[0]) as db:
+        assert db.execute("SELECT value FROM sample ORDER BY rowid DESC LIMIT 1").fetchone()[0] == "later"
 
 
 def test_verify_rejects_missing_file(tmp_path):
