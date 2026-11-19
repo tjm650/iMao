@@ -13,10 +13,12 @@ table inet imao {
         iifname "{{HOTSPOT_INTERFACE}}" udp dport 53 accept
         iifname "{{HOTSPOT_INTERFACE}}" tcp dport 53 accept
         iifname "{{HOTSPOT_INTERFACE}}" tcp dport {{PORTAL_PORT}} accept
+        iifname "{{HOTSPOT_INTERFACE}}" drop
     }
 
     chain forward {
         type filter hook forward priority filter; policy accept;
+        iifname "{{HOTSPOT_INTERFACE}}" ip saddr != @authorized_v4 drop
         ct state established,related accept
         iifname "{{HOTSPOT_INTERFACE}}" oifname "{{UPSTREAM_INTERFACE}}" ip saddr @authorized_v4 accept
         iifname "{{HOTSPOT_INTERFACE}}" drop
