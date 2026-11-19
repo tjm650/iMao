@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-CONFIG = Path("/etc/imao/netctl.json")
+CONFIG = Path("/etc/wimao/netctl.json")
 
 
 def load_config():
@@ -23,7 +23,7 @@ def nft(*args):
 
 
 def chain_rules():
-    result = nft("-j", "list", "chain", "inet", "imao", "forward")
+    result = nft("-j", "list", "chain", "inet", "wimao", "forward")
     return json.loads(result.stdout).get("nftables", [])
 
 
@@ -34,9 +34,9 @@ def find_counter_rules(ip):
         if not rule:
             continue
         comment = rule.get("comment", "")
-        if comment == f"imao-up:{ip}":
+        if comment == f"wimao-up:{ip}":
             found["up"] = rule
-        elif comment == f"imao-down:{ip}":
+        elif comment == f"wimao-down:{ip}":
             found["down"] = rule
     return found
 
@@ -45,17 +45,17 @@ def remove_counters(ip):
     try:
         rules = find_counter_rules(ip)
     except subprocess.CalledProcessError:
-        # If the dedicated iMao table was removed, the client is already blocked
+        # If the dedicated wiMao table was removed, the client is already blocked
         # by that policy being absent; treat counter cleanup as complete.
         return
     for rule in rules.values():
         if rule and rule.get("handle") is not None:
-            nft("delete", "rule", "inet", "imao", "forward", "handle", str(rule["handle"]))
+            nft("delete", "rule", "inet", "wimao", "forward", "handle", str(rule["handle"]))
 
 
 def main():
     if len(sys.argv) != 3 or sys.argv[1] not in {"authorize", "revoke", "stats"}:
-        raise SystemExit("Usage: imao-netctl {authorize|revoke|stats} CLIENT_IPV4")
+        raise SystemExit("Usage: wimao-netctl {authorize|revoke|stats} CLIENT_IPV4")
     action, raw_ip = sys.argv[1:]
     network, iface = load_config()
     address = ipaddress.IPv4Address(raw_ip)
@@ -64,21 +64,21 @@ def main():
 
     if action == "authorize":
         try:
-            nft("delete", "element", "inet", "imao", "authorized_v4", "{", str(address), "}")
+            nft("delete", "element", "inet", "wimao", "authorized_v4", "{", str(address), "}")
         except subprocess.CalledProcessError:
             pass
-        nft("add", "element", "inet", "imao", "authorized_v4", "{", str(address), "timeout", "12h", "}")
+        nft("add", "element", "inet", "wimao", "authorized_v4", "{", str(address), "timeout", "12h", "}")
         rules = find_counter_rules(str(address))
         if rules["up"] is None:
-            nft("insert", "rule", "inet", "imao", "forward", "iifname", iface, "ip", "saddr",
-                str(address), "counter", "comment", f"imao-up:{address}")
+            nft("insert", "rule", "inet", "wimao", "forward", "iifname", iface, "ip", "saddr",
+                str(address), "counter", "comment", f"wimao-up:{address}")
         if rules["down"] is None:
-            nft("insert", "rule", "inet", "imao", "forward", "oifname", iface, "ip", "daddr",
-                str(address), "counter", "comment", f"imao-down:{address}")
+            nft("insert", "rule", "inet", "wimao", "forward", "oifname", iface, "ip", "daddr",
+                str(address), "counter", "comment", f"wimao-down:{address}")
         print("authorized")
     elif action == "revoke":
         try:
-            nft("delete", "element", "inet", "imao", "authorized_v4", "{", str(address), "}")
+            nft("delete", "element", "inet", "wimao", "authorized_v4", "{", str(address), "}")
         except subprocess.CalledProcessError:
             pass
         remove_counters(str(address))
@@ -102,5 +102,5 @@ if __name__ == "__main__":
     try:
         main()
     except (KeyError, ValueError, OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        print(f"imao-netctl: {exc}", file=sys.stderr)
+        print(f"wimao-netctl: {exc}", file=sys.stderr)
         raise SystemExit(1)
