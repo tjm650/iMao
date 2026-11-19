@@ -62,7 +62,7 @@ sudo apt update
 sudo apt install -y git python3 python3-venv python3-pip iproute2 iw
 ~~~
 
-The following packages are needed on the eventual gateway when preparing the Wi-Fi access point and firewall. They can be installed now or at deployment time:
+The following packages are needed on the eventual gateway when preparing the Wi-Fi access point and firewall. Caddy is additionally required if PORTAL_PUBLIC_URL is configured; install it using the official Caddy instructions for your Linux distribution. These packages can be installed at deployment time:
 
 ~~~bash
 sudo apt install -y hostapd dnsmasq nftables
@@ -229,7 +229,7 @@ Review the generated files:
 sed -n '1,200p' runtime-config/hostapd.conf
 sed -n '1,200p' runtime-config/dnsmasq.conf
 sed -n '1,240p' runtime-config/nftables.conf
-sed -n '1,160p' runtime-config/Caddyfile
+if [ -f runtime-config/Caddyfile ]; then sed -n '1,160p' runtime-config/Caddyfile; fi
 ~~~
 
 Do not share the hostapd output publicly because it contains the Wi-Fi password.
