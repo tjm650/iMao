@@ -27,7 +27,7 @@ def generate_voucher_code() -> str:
 
 def create_voucher(quota_mb: int | None = None, expires_at: str | None = None) -> str:
     settings = get_settings()
-    quota = megabytes_to_bytes(quota_mb or settings.default_quota_mb)
+    quota = megabytes_to_bytes(settings.default_quota_mb if quota_mb is None else quota_mb)
     code = generate_voucher_code()
     with connect() as db:
         db.execute(
