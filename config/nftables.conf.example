@@ -1,0 +1,31 @@
+# Reference policy template. The installer generates interface/subnet-specific rules.
+# The dedicated iMao table is isolated from unrelated firewall tables.
+table inet imao {
+    set authorized_v4 {
+        type ipv4_addr
+        flags timeout
+        timeout 12h
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "{{HOTSPOT_INTERFACE}}" udp dport { 67, 68 } accept
+        iifname "{{HOTSPOT_INTERFACE}}" udp dport 53 accept
+        iifname "{{HOTSPOT_INTERFACE}}" tcp dport 53 accept
+        iifname "{{HOTSPOT_INTERFACE}}" tcp dport {{PORTAL_PORT}} accept
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy accept;
+        ct state established,related accept
+        iifname "{{HOTSPOT_INTERFACE}}" oifname "{{UPSTREAM_INTERFACE}}" ip saddr @authorized_v4 accept
+        iifname "{{HOTSPOT_INTERFACE}}" drop
+    }
+}
+
+table ip imao_nat {
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "{{UPSTREAM_INTERFACE}}" ip saddr {{HOTSPOT_CIDR}} masquerade
+    }
+}
