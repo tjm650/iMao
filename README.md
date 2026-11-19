@@ -28,7 +28,7 @@ Still pending:
 - Verification of actual nftables JSON/counter behavior on target distributions
 - Hard byte-exact quota enforcement (polling-based enforcement can exceed the limit between polls and during in-flight packets)
 - Reliable hostapd/dnsmasq setup, static hotspot address management and service lifecycle/rollback
-- Complete administration dashboard, voucher management, reporting, production deployment, monitoring and recovery testing
+- Expanded administration roles/permissions, voucher export/printing, richer reporting, production deployment, monitoring and recovery testing
 
 ## Requirements
 
@@ -161,6 +161,24 @@ http://127.0.0.1:8000
 ~~~
 
 For a gateway deployment, the host binding and exposure policy will need to be configured deliberately. Do not expose the development server directly to the public internet. Stop the development server with Ctrl+C.
+
+## G. Create an administrator account and open the admin dashboard
+
+Administrator accounts are provisioned locally by an operator. There is no public registration route and no default administrator password. After installing the Python dependencies and creating the local `.env`, run:
+
+~~~bash
+python scripts/create-admin.py --username operator
+~~~
+
+Enter and confirm a strong password when prompted. The password is stored as an Argon2 hash. Start the application and open:
+
+~~~text
+http://127.0.0.1:8000/admin
+~~~
+
+The administrator session uses an HttpOnly, SameSite=Strict cookie with an eight-hour server-side expiry and is rate-limited after repeated failed sign-in attempts. Use HTTPS for any non-local deployment. The dashboard supports voucher batches (up to 500 codes per batch), one-time display of generated codes, available/redeemed/revoked filtering, revocation of unused vouchers, summary statistics and an audit trail. Generated voucher codes are shown only at creation time; copy and store them securely.
+
+The protected API also provides session history at `/api/admin/sessions`. Administrator creation is a local CLI operation; do not expose the CLI or database to untrusted users.
 
 ## G. Create test vouchers
 
