@@ -173,7 +173,7 @@ def admin_login(payload: AdminLogin, request: Request, response: Response):
 @app.get("/api/admin/me")
 def admin_me(request: Request):
     admin = require_admin(request)
-    return {"username": admin["username"], "expires_at": admin["expires_at"]}
+    return {"username": admin["username"], "role": admin["role"], "expires_at": admin["expires_at"]}
 
 
 @app.post("/api/admin/logout")
