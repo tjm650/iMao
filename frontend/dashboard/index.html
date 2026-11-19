@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>Your connection | iMao</title>
+  <link rel="stylesheet" href="/static-dashboard/style.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <div class="brand-mark">i</div>
+      <p class="eyebrow">CONNECTED</p>
+      <h1>You're online</h1>
+      <p class="muted">Your iMao access session is active.</p>
+      <div class="usage">
+        <div><span>Data used</span><strong id="used">Loading…</strong></div>
+        <div><span>Data remaining</span><strong id="remaining">Loading…</strong></div>
+      </div>
+      <div class="track"><div id="progress"></div></div>
+      <p id="status" class="message" role="status" aria-live="polite"></p>
+      <button id="logout" type="button">Log out</button>
+    </section>
+  </main>
+  <script src="/static-dashboard/app.js"></script>
+</body>
+</html>
