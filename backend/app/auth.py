@@ -155,7 +155,7 @@ def current_session(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Session is no longer active")
     if row["expires_at"] and datetime.fromisoformat(row["expires_at"]) <= _now():
         with connect() as db:
-            db.execute("UPDATE sessions SET status='expired', ended_at=?, revocation_pending=? WHERE id=? AND status='active'",
+            db.execute("UPDATE sessions SET status='stale', ended_at=?, revocation_pending=? WHERE id=? AND status='active'",
                        (_now().isoformat(), int(get_settings().firewall_enabled), row["id"]))
         settings = get_settings()
         if settings.firewall_enabled and settings.firewall_backend == "nftables":
