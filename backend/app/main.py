@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend.app.accounting import account_active_sessions, expire_sessions
+from backend.app.accounting import account_active_sessions, expire_sessions, retry_pending_revocations
 from backend.app.auth import authenticate_voucher, current_session, logout_session
 from backend.app.config import get_settings
 from database.database import initialize_database
@@ -34,6 +34,7 @@ async def _accounting_loop() -> None:
         try:
             await asyncio.to_thread(account_active_sessions)
             await asyncio.to_thread(expire_sessions)
+            await asyncio.to_thread(retry_pending_revocations)
         except Exception:
             logger.exception("iMao accounting cycle failed")
         await asyncio.sleep(max(2, settings.session_poll_seconds))
@@ -41,6 +42,10 @@ async def _accounting_loop() -> None:
 
 @app.on_event("startup")
 async def startup() -> None:
+    if settings.firewall_enabled and settings.firewall_backend != "nftables":
+        raise RuntimeError("FIREWALL_ENABLED requires FIREWALL_BACKEND=nftables")
+    if settings.firewall_enabled and settings.session_max_hours != 12:
+        raise RuntimeError("The current nftables helper uses a fixed 12-hour authorization lease; SESSION_MAX_HOURS must be 12")
     initialize_database()
     app.state.accounting_task = asyncio.create_task(_accounting_loop())
 
