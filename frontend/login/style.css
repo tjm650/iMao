@@ -20,3 +20,8 @@ button { min-height: 49px; border: 0; border-radius: 11px; background: linear-gr
 button:disabled { opacity: .6; cursor: wait; }
 .message { min-height: 20px; margin: 0; color: #fca5a5; font-size: 13px; }
 .fine-print { margin: 24px 0 0; font-size: 11px; }
+
+.field-help { margin: -5px 0 2px; color: #8295ad; font-size: 11px; line-height: 1.5; }
+.message.success { color: #6ee7b7; }
+input { letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .shell { padding: 16px; } .panel { padding: 28px 22px; border-radius: 18px; } }
