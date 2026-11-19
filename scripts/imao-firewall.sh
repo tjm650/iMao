@@ -27,8 +27,14 @@ require_value UPSTREAM_INTERFACE
 require_value HOTSPOT_INTERFACE
 require_value HOTSPOT_CIDR
 [[ "$UPSTREAM_INTERFACE" != "$HOTSPOT_INTERFACE" ]] || { echo "Interfaces must differ." >&2; exit 1; }
-[[ "${FIREWALL_ENABLED:-false}" == "true" ]] || { echo "FIREWALL_ENABLED must be true for firewall commands." >&2; exit 1; }
 command -v nft >/dev/null || { echo "nftables is not installed." >&2; exit 1; }
+
+require_firewall_enabled() {
+  [[ "${FIREWALL_ENABLED:-false}" == "true" ]] || {
+    echo "FIREWALL_ENABLED must be true for commands that change firewall state." >&2
+    exit 1
+  }
+}
 
 case "${1:-}" in
   check)
@@ -37,6 +43,7 @@ case "${1:-}" in
     echo "Ruleset syntax is valid. No rules were applied."
     ;;
   install)
+    require_firewall_enabled
     [[ "${2:-}" == "--confirm" ]] || { echo "Usage: sudo scripts/imao-firewall.sh install --confirm" >&2; exit 2; }
     [[ -f "$NFT_FILE" ]] || { echo "Run scripts/imao-network.py render first." >&2; exit 1; }
     nft -c -f "$NFT_FILE"
@@ -47,6 +54,7 @@ case "${1:-}" in
     echo "iMao firewall tables installed. No client is authorized yet."
     ;;
   authorize)
+    require_firewall_enabled
     [[ $# -eq 3 ]] || { echo "Usage: sudo scripts/imao-firewall.sh authorize CLIENT_IPV4 TTL (e.g. 12h)" >&2; exit 2; }
     python3 - "$2" <<'PY'
 import ipaddress, sys
@@ -55,6 +63,7 @@ PY
     nft add element inet imao authorized_v4 "{ $2 timeout $3 }"
     ;;
   revoke)
+    require_firewall_enabled
     [[ $# -eq 2 ]] || { echo "Usage: sudo scripts/imao-firewall.sh revoke CLIENT_IPV4" >&2; exit 2; }
     nft delete element inet imao authorized_v4 "{ $2 }"
     ;;
