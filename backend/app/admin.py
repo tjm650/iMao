@@ -9,7 +9,7 @@ from fastapi import HTTPException, Request, Response
 
 from database.database import connect
 
-COOKIE_NAME = "imao_admin"
+COOKIE_NAME = "wimao_admin"
 SESSION_HOURS = 8
 _passwords = PasswordHasher()
 
@@ -322,5 +322,5 @@ def usage_report(start_date: str | None = None, end_date: str | None = None) -> 
         "vouchers": {"redeemed": int(vouchers["redeemed"] or 0), "quota_issued_bytes": int(vouchers["quota_issued"] or 0),
                      "recorded_usage_bytes": int(vouchers["voucher_usage"] or 0)},
         "daily": [dict(row) for row in daily],
-        "revenue": {"available": False, "reason": "iMao has no payment ledger or recorded transaction amounts yet."},
+        "revenue": {"available": False, "reason": "wiMao has no payment ledger or recorded transaction amounts yet."},
     }
