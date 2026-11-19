@@ -218,15 +218,14 @@ def update_admin_access(actor_id: int, target_id: int, role: str, is_active: boo
         target = db.execute("SELECT id FROM admin_users WHERE id=?", (target_id,)).fetchone()
         if not target:
             raise HTTPException(status_code=404, detail="Administrator not found")
-        if True:
-            active_admins = db.execute(
-                "SELECT COUNT(*) FROM admin_users WHERE role='admin' AND is_active=1"
-            ).fetchone()[0]
-            current_admin = db.execute(
-                "SELECT role, is_active FROM admin_users WHERE id=?", (target_id,)
-            ).fetchone()
-            if current_admin["role"] == "admin" and current_admin["is_active"] and (role != "admin" or not is_active) and active_admins <= 1:
-                raise HTTPException(status_code=409, detail="At least one active administrator must remain")
+        active_admins = db.execute(
+            "SELECT COUNT(*) FROM admin_users WHERE role='admin' AND is_active=1"
+        ).fetchone()[0]
+        current_admin = db.execute(
+            "SELECT role, is_active FROM admin_users WHERE id=?", (target_id,)
+        ).fetchone()
+        if current_admin["role"] == "admin" and current_admin["is_active"] and (role != "admin" or not is_active) and active_admins <= 1:
+            raise HTTPException(status_code=409, detail="At least one active administrator must remain")
         db.execute("UPDATE admin_users SET role=?, is_active=? WHERE id=?",
                    (role, int(is_active), target_id))
         db.execute(
