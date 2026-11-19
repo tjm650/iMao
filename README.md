@@ -19,6 +19,8 @@ Implemented:
 - Separate root-owned, command-allow-listed helper for client authorization, revocation and directional byte counters
 - Optional voucher-to-network authorization bridge
 - Background traffic accounting, session expiry and queued revocation retries
+- OS captive-portal probes, RFC 8908 API, IPv4 HTTP-only interception and Caddy TLS/DHCPv4 option 114 configuration generation
+- Improved voucher entry, connection feedback and automatically refreshed usage dashboard
 - Automated Python test workflow in GitHub Actions
 
 Still pending:
@@ -26,7 +28,6 @@ Still pending:
 - Verification of actual nftables JSON/counter behavior on target distributions
 - Hard byte-exact quota enforcement (polling-based enforcement can exceed the limit between polls and during in-flight packets)
 - Reliable hostapd/dnsmasq setup, static hotspot address management and service lifecycle/rollback
-- OS captive-portal probes, RFC 8908 API, HTTP-only unauthenticated interception, optional Caddy TLS template and RFC 8910 DHCPv4 option 114 generation
 - Complete administration dashboard, voucher management, reporting, production deployment, monitoring and recovery testing
 
 ## Requirements
