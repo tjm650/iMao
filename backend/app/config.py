@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     portal_host: str = "0.0.0.0"
     portal_port: int = 8000
+    portal_public_url: str = ""
     cookie_secure: bool = False
 
     default_quota_mb: int = 500
