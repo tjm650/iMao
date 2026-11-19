@@ -490,14 +490,15 @@ Set `DATABASE_PATH=/var/lib/imao/imao.sqlite3` in the protected environment file
 
 The template leaves `NoNewPrivileges=false` because the existing restricted network helper is invoked through a narrow sudoers rule. This is a deliberate privilege boundary that must be reviewed: keep the helper root-owned, keep sudoers limited to the exact helper executable, and do not grant a general shell or unrestricted sudo access to the service account.
 
-Before a future installation, review the template and validate it with:
+During an explicitly approved deployment, install a reviewed copy and validate the installed unit before enabling it:
 
 ~~~bash
-sudo systemd-analyze verify config/systemd/imao.service.example
+sudo install -o root -g root -m 0644 config/systemd/imao.service.example /etc/systemd/system/imao.service
+sudo systemd-analyze verify /etc/systemd/system/imao.service
 sudo systemd-analyze security imao.service
 ~~~
 
-A future gateway operator may install a reviewed copy, then inspect it with `systemctl status` and `journalctl`. Do not copy, enable or start this service as part of ordinary application development. Service installation and startup require a separate deployment approval and rollback plan.
+These commands install and inspect the unit file but do not enable or start it. Do not run them as part of ordinary application development. Service enablement and startup require separate deployment approval and a rollback plan.
 
 ### Operational monitoring and recovery checklist
 
