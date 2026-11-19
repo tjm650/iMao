@@ -15,6 +15,10 @@ FRONTEND_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "login"
 if FRONTEND_ROOT.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_ROOT), name="portal-static")
 
+DASHBOARD_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "dashboard"
+if DASHBOARD_ROOT.exists():
+    app.mount("/static-dashboard", StaticFiles(directory=DASHBOARD_ROOT), name="dashboard-static")
+
 
 class VoucherLogin(BaseModel):
     code: str = Field(min_length=8, max_length=64)
