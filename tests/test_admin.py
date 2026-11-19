@@ -13,6 +13,28 @@ def _test_settings(path):
     return Settings(database_path=str(path), app_secret_key="test-secret-key-with-at-least-32-characters")
 
 
+def test_bootstrap_creates_only_the_first_administrator(tmp_path, monkeypatch):
+    settings = _test_settings(tmp_path / "bootstrap.sqlite3")
+    monkeypatch.setattr(database, "get_settings", lambda: settings)
+    database.initialize_database()
+
+    admin.bootstrap_admin("firstadmin", "a-strong-password-123")
+    with database.connect() as db:
+        row = db.execute("SELECT username, password_hash, role FROM admin_users").fetchone()
+        assert row["username"] == "firstadmin"
+        assert row["role"] == "admin"
+        assert row["password_hash"] != "a-strong-password-123"
+        assert db.execute(
+            "SELECT action FROM audit_logs WHERE action='admin.bootstrap'"
+        ).fetchone() is not None
+
+    with pytest.raises(HTTPException) as error:
+        admin.bootstrap_admin("secondadmin", "another-strong-password")
+    assert error.value.status_code == 409
+    with database.connect() as db:
+        assert db.execute("SELECT COUNT(*) FROM admin_users").fetchone()[0] == 1
+
+
 def test_admin_can_create_batch_and_revoke_only_unused_voucher(tmp_path, monkeypatch):
     settings = _test_settings(tmp_path / "admin.sqlite3")
     monkeypatch.setattr(database, "get_settings", lambda: settings)
