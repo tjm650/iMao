@@ -128,6 +128,13 @@ def render():
         dns_option = f'dhcp-option=114,"{api_uri}"'
         dns_override = f"address=/{portal_hostname}/{gateway}"
 
+    try:
+        portal_port = int(env.get("PORTAL_PORT", "8000"))
+    except ValueError as exc:
+        raise SystemExit("PORTAL_PORT must be a valid TCP port number.") from exc
+    if not 1024 <= portal_port <= 65535 or portal_port in (80, 443):
+        raise SystemExit("PORTAL_PORT must be between 1024 and 65535, excluding 80 and 443.")
+
     values = {
         "PORTAL_DHCP_OPTION": dns_option,
         "PORTAL_DNS_OVERRIDE": dns_override,
@@ -135,7 +142,7 @@ def render():
         "HOTSPOT_CIDR": str(cidr), "HOTSPOT_GATEWAY": str(gateway),
         "HOTSPOT_SSID": ssid, "HOTSPOT_PASSPHRASE": passphrase,
         "WIFI_COUNTRY_CODE": country, "HOTSPOT_DHCP_START": str(start),
-        "HOTSPOT_DHCP_END": str(end), "PORTAL_PORT": env.get("PORTAL_PORT", "8000")
+        "HOTSPOT_DHCP_END": str(end), "PORTAL_PORT": str(portal_port)
     }
     output = ROOT / "runtime-config"
     output.mkdir(exist_ok=True)
