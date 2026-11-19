@@ -180,6 +180,24 @@ The administrator session uses an HttpOnly, SameSite=Strict cookie with an eight
 
 The protected API also provides session history at `/api/admin/sessions`. Administrator creation is a local CLI operation; do not expose the CLI or database to untrusted users.
 
+Create scoped administrator accounts from the gateway's local shell. Roles are:
+- `admin` — full access, including managing administrator roles and disabling accounts.
+- `manager` — dashboard, voucher creation/revocation, reports and audit history.
+- `operator` — dashboard and voucher creation/listing; cannot revoke vouchers or manage accounts.
+- `viewer` — read-only dashboard, voucher listing and usage reports.
+
+For example:
+~~~bash
+python scripts/create-admin.py --username frontdesk --role operator
+python scripts/create-admin.py --username accountant --role viewer
+~~~
+
+An administrator can change another administrator's role or disable their account from the dashboard. The system prevents self-demotion/self-disable and prevents removing the final active administrator. Existing administrator accounts are migrated with the `admin` role.
+
+Voucher batch codes are returned once and are not stored in plaintext. Immediately after creating a batch, download its CSV or print the voucher sheet; keep these files private. The separate voucher-record CSV export contains metadata only and never contains voucher codes or password hashes.
+
+The usage report supports date filters and summarizes sessions, upload/download traffic, redeemed vouchers, issued quota and recorded voucher usage. **Revenue is deliberately not calculated:** iMao does not yet record payments or transaction amounts. A future payment ledger is required before actual revenue reporting can be trusted.
+
 ## G. Create test vouchers
 
 With the virtual environment active and from the repository root:
@@ -426,5 +444,5 @@ Trust forwarded headers only from loopback so the API can identify hotspot clien
 3. Host network discovery, AP/DHCP/DNS templates and isolated nftables policy (target-host validation pending)
 4. Privileged session authorization bridge, per-client traffic accounting and quota enforcement (implementation committed; target-host validation pending)
 5. Captive portal detection and client experience (HTTP interception, optional Caddy TLS template and DHCPv4 option 114 renderer implemented; deployment validation and IPv6 support pending)
-6. Admin dashboard, voucher batches and reports
+6. Admin dashboard, role-based access, voucher batches, exports and usage reports
 7. systemd deployment, recovery and security testing
