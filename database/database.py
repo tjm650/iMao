@@ -25,6 +25,7 @@ def initialize_database(database_path: str | Path | None = None) -> None:
             "expires_at": "TEXT",
             "last_counter_up": "INTEGER",
             "last_counter_down": "INTEGER",
+            "revocation_pending": "INTEGER NOT NULL DEFAULT 0",
         }
         for name, definition in migrations.items():
             if name not in columns:
